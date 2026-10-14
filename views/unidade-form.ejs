@@ -7,7 +7,13 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
-  <p class="caminho"><a href="/">Início</a> › <%= rotuloTipo %> nova</p>
+  <p class="caminho">
+    <a href="/">Início</a>
+    <% if (superior) { %>
+      › <a href="/unidades/<%= superior.id %>"><%= superior.titulo %></a>
+    <% } %>
+    › <%= modo === 'editar' ? 'Editar' : (rotuloTipo + ' nova') %>
+  </p>
   <h1><%= titulo %></h1>
 
   <% if (erros && erros.length > 0) { %>
@@ -21,10 +27,12 @@
     </div>
   <% } %>
 
-  <form method="POST" action="/unidades/nova">
-    <input type="hidden" name="tipo" value="<%= tipo %>">
-    <% if (superior) { %>
-      <input type="hidden" name="superior_id" value="<%= superior.id %>">
+  <form method="POST" action="<%= acao %>">
+    <% if (modo === 'criar') { %>
+      <input type="hidden" name="tipo" value="<%= tipo %>">
+      <% if (superior) { %>
+        <input type="hidden" name="superior_id" value="<%= superior.id %>">
+      <% } %>
     <% } %>
 
     <% if (superior) { %>
@@ -55,7 +63,7 @@
 
     <div class="acoes">
       <button type="submit">Salvar</button>
-      <a class="caminho cancelar" href="/">Cancelar</a>
+      <a class="caminho cancelar" href="<%= cancelarUrl %>">Cancelar</a>
     </div>
   </form>
 

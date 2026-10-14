@@ -79,7 +79,7 @@ app.get("/", async (req, res) => {
   }
 });
 
-// Rota: formulário de criação de unidade  ← MOVIDA PARA CIMA
+// Rota: formulário de criação
 app.get("/unidades/nova", async (req, res) => {
   const tipo = String(req.query.tipo || "eixo");
   const superiorId = req.query.superior_id ? Number(req.query.superior_id) : null;
@@ -107,11 +107,13 @@ app.get("/unidades/nova", async (req, res) => {
     superior,
     valores: { titulo: "", codigo: "", descricao: "", pergunta_norteadora: "" },
     erros: [],
-    modo: "criar"
+    modo: "criar",
+    acao: "/unidades/nova",
+    cancelarUrl: superior ? `/unidades/${superior.id}` : "/"
   });
 });
 
-// Rota: processar criação de unidade
+// Rota: processar criação
 app.post("/unidades/nova", async (req, res) => {
   const tipo = String(req.body.tipo || "").trim();
   const superiorId = req.body.superior_id ? Number(req.body.superior_id) : null;
@@ -136,12 +138,7 @@ app.post("/unidades/nova", async (req, res) => {
       erros.push("Unidade superior não encontrada.");
     } else {
       superior = r.rows[0];
-      const esperado = {
-        disciplina: "eixo",
-        modulo: "disciplina",
-        tema: "modulo",
-        aula: "tema"
-      };
+      const esperado = { disciplina: "eixo", modulo: "disciplina", tema: "modulo", aula: "tema" };
       if (esperado[tipo] && superior.tipo !== esperado[tipo]) {
         erros.push(`Uma ${ROTULO_TIPO[tipo]} deve pertencer a um(a) ${ROTULO_TIPO[esperado[tipo]]}.`);
       }
@@ -158,7 +155,9 @@ app.post("/unidades/nova", async (req, res) => {
       superior,
       valores: { titulo, codigo: codigo || "", descricao: descricao || "", pergunta_norteadora: pergunta || "" },
       erros,
-      modo: "criar"
+      modo: "criar",
+      acao: "/unidades/nova",
+      cancelarUrl: superior ? `/unidades/${superior.id}` : "/"
     });
   }
 
@@ -185,10 +184,116 @@ app.post("/unidades/nova", async (req, res) => {
   }
 });
 
-// Rota: página de uma unidade  ← AGORA DEPOIS DE /nova
+// Rota: formulário de edição
+app.get("/unidades/:id/editar", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const u = r.rows[0];
+
+  let superior = null;
+  if (u.superior_id) {
+    const s = await pool.query(
+      "SELECT id, tipo, titulo FROM unidades WHERE id = $1",
+      [u.superior_id]
+    );
+    if (s.rows.length > 0) superior = s.rows[0];
+  }
+
+  res.render("unidade-form", {
+    titulo: `Editar ${ROTULO_TIPO[u.tipo]}`,
+    tipo: u.tipo,
+    rotuloTipo: ROTULO_TIPO[u.tipo],
+    superior,
+    valores: {
+      titulo: u.titulo,
+      codigo: u.codigo || "",
+      descricao: u.descricao || "",
+      pergunta_norteadora: u.pergunta_norteadora || ""
+    },
+    erros: [],
+    modo: "editar",
+    acao: `/unidades/${u.id}/editar`,
+    cancelarUrl: `/unidades/${u.id}`
+  });
+});
+
+// Rota: processar edição
+app.post("/unidades/:id/editar", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id, tipo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const atual = r.rows[0];
+
+  const titulo = String(req.body.titulo || "").trim();
+  const codigo = String(req.body.codigo || "").trim() || null;
+  const descricao = String(req.body.descricao || "").trim() || null;
+  const pergunta = String(req.body.pergunta_norteadora || "").trim() || null;
+
+  const erros = [];
+  if (!titulo) erros.push("O título é obrigatório.");
+  if (atual.tipo !== "tema" && pergunta) {
+    erros.push("Pergunta norteadora só existe em tema.");
+  }
+
+  let superior = null;
+  if (atual.superior_id) {
+    const s = await pool.query(
+      "SELECT id, tipo, titulo FROM unidades WHERE id = $1",
+      [atual.superior_id]
+    );
+    if (s.rows.length > 0) superior = s.rows[0];
+  }
+
+  if (erros.length > 0) {
+    return res.status(400).render("unidade-form", {
+      titulo: `Editar ${ROTULO_TIPO[atual.tipo]}`,
+      tipo: atual.tipo,
+      rotuloTipo: ROTULO_TIPO[atual.tipo],
+      superior,
+      valores: { titulo, codigo: codigo || "", descricao: descricao || "", pergunta_norteadora: pergunta || "" },
+      erros,
+      modo: "editar",
+      acao: `/unidades/${id}/editar`,
+      cancelarUrl: `/unidades/${id}`
+    });
+  }
+
+  await pool.query(
+    `UPDATE unidades
+        SET titulo = $1,
+            codigo = $2,
+            descricao = $3,
+            pergunta_norteadora = $4,
+            atualizado_em = now()
+      WHERE id = $5`,
+    [titulo, codigo, descricao, pergunta, id]
+  );
+
+  res.redirect(`/unidades/${id}`);
+});
+
+// Rota: página de uma unidade
 app.get("/unidades/:id", async (req, res) => {
   const id = Number(req.params.id);
-
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).type("text/plain").send("Id inválido.");
   }
