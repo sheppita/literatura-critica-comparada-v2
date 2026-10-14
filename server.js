@@ -21,6 +21,8 @@ app.set("views", path.join(__dirname, "views"));
 // Permite ler o corpo de formulários HTML (POST)
 app.use(express.urlencoded({ extended: true }));
 
+app.use(express.static(path.join(__dirname, "public")));
+
 const TIPOS_VALIDOS = ["eixo", "disciplina", "modulo", "tema", "aula"];
 
 const ROTULO_TIPO = {
