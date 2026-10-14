@@ -14,6 +14,9 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D8 | Stack: Node.js + Express + PostgreSQL (Neon) + Render | consolidada |
 | D9 | Renderização no servidor (sem SPA React) | consolidada |
 | D10 | ORM: não; SQL direto com consultas parametrizadas | consolidada |
+| D11 | Fonte: Quicksand (Google Fonts) | consolidada |
+| D12 | Paleta: cozy autumn (creme, terracota, mostarda, marrom, verde-musgo) | consolidada |
+| D13 | CSS centralizado em `public/estilo.css` | consolidada |
 
 ## Observações
 
