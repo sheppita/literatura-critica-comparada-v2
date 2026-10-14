@@ -9,17 +9,17 @@ Fase 0 — Fundação.
 - 0.1 Repositório novo no GitHub criado.
 - 0.2 Banco novo no Neon criado e vazio.
 - 0.3 VS Code configurado, repositório clonado localmente.
+- 0.3 Arquivos iniciais criados: package.json, server.js, .env.example, DECISIONS.md, STATUS.md.
+- 0.3 npm install executado, servidor testado localmente em /health e /, commit e push enviados ao GitHub.
 
 ## Em andamento
 
-- 0.3 Criação dos arquivos iniciais do projeto (`package.json`, `server.js`, etc.).
+- 0.4 Criação do serviço novo no Render.
 
 ## Próximo
 
-- 0.3 Rodar `npm install` e testar o servidor localmente.
-- 0.4 Criar serviço novo no Render.
-- 0.5 Confirmar rota `/health` no endereço público.
+- 0.5 Confirmar rota /health no endereço público.
 
 ## Onde paramos
 
-Última etapa concluída: arquivos iniciais criados no VS Code.
+Esqueleto do projeto no ar localmente. Próximo passo: publicar no Render.
