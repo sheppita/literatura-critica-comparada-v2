@@ -19,20 +19,21 @@ Fase 1 — Estrutura curricular.
 - 1.3 Página inicial lê eixos do banco.
 - 1.4a Formulário de criação de unidade.
 - 1.4b Rota POST que salva no banco (com validações e hierarquia).
-- 1.4c.1 Página de uma unidade (`/unidades/:id`), navegação hierárquica,
-  botão contextual "Adicionar filho", caminho de navegação.
+- 1.4c.1 Página de uma unidade, navegação hierárquica, caminho de navegação.
+- 1.4c.2 Edição de unidade existente.
+- 1.4c.3 Exclusão com confirmação e bloqueio quando há filhos.
 - Estilo: Quicksand + paleta cozy autumn, CSS em public/estilo.css.
 
 ## Em andamento
 
-- 1.4c.2 Edição de unidade existente.
+- Cadastro dos nove eixos reais.
 
 ## Próximo
 
-- 1.4c.2 Rota /unidades/:id/editar (GET e POST).
-- 1.4c.3 Exclusão com confirmação (apenas se sem filhos).
-- Cadastrar os nove eixos reais.
+- Cadastrar os nove eixos e começar a popular a hierarquia (disciplinas, módulos, temas, aulas).
+- Depois: Fase 2 — fichas de aula.
 
 ## Onde paramos
 
-Navegação e criação funcionando até o nível de disciplina. Próximo: edição.
+Estrutura curricular totalmente operacional (criar, navegar, editar, excluir).
+Próximo passo manual: cadastrar os nove eixos.
