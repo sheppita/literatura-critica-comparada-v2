@@ -1,8 +1,11 @@
 import "dotenv/config";
 import express from "express";
 import pg from "pg";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const { Pool } = pg;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,10 +15,27 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-app.get("/", (req, res) => {
-  res.type("text/plain").send("Literatura Crítica Comparada — v2\n");
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
+// Rota: página inicial
+app.get("/", async (req, res) => {
+  try {
+    const r = await pool.query(
+      "SELECT id, titulo, codigo FROM unidades WHERE tipo = 'eixo' ORDER BY ordem, id"
+    );
+    res.render("inicio", {
+      titulo: "Literatura Crítica Comparada",
+      subtitulo: "Acervo pessoal de curadoria curricular e bibliográfica",
+      eixos: r.rows
+    });
+  } catch (err) {
+    console.error("Erro na página inicial:", err.message);
+    res.status(500).type("text/plain").send("Erro ao carregar a página inicial.");
+  }
 });
 
+// Rota: health
 app.get("/health", async (req, res) => {
   try {
     const r = await pool.query("SELECT COUNT(*)::int AS total FROM unidades");

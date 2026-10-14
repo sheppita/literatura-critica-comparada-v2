@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.55;
+      color: #222;
+    }
+    h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+    h1 a { color: inherit; text-decoration: none; }
+    .subtitulo { color: #666; margin-top: 0; }
+    .aviso-vazio {
+      background: #f4f4f4;
+      border-left: 4px solid #999;
+      padding: 0.75rem 1rem;
+      color: #444;
+    }
+    ul { padding-left: 1.2rem; }
+    li { margin-bottom: 0.25rem; }
+    footer { margin-top: 3rem; font-size: 0.85rem; color: #888; }
+    footer a { color: #666; }
+  </style>
+</head>
+<body>
+  <h1><a href="/"><%= titulo %></a></h1>
+  <% if (typeof subtitulo !== 'undefined' && subtitulo) { %>
+    <p class="subtitulo"><%= subtitulo %></p>
+  <% } %>
+
+  <% if (eixos.length === 0) { %>
+    <p class="aviso-vazio">
+      Nenhum eixo cadastrado ainda. Assim que a tela de cadastro estiver pronta,
+      os eixos aparecerão aqui.
+    </p>
+  <% } else { %>
+    <ul>
+      <% for (const eixo of eixos) { %>
+        <li>
+          <% if (eixo.codigo) { %><strong><%= eixo.codigo %></strong> — <% } %>
+          <%= eixo.titulo %>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+</body>
+</html>
