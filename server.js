@@ -31,6 +31,37 @@ const ROTULO_TIPO = {
   aula: "Aula"
 };
 
+const PROXIMO_NIVEL = {
+  eixo: "disciplina",
+  disciplina: "modulo",
+  modulo: "tema",
+  tema: "aula",
+  aula: null
+};
+
+const NOME_FILHO_PLURAL = {
+  eixo: "disciplinas",
+  disciplina: "módulos",
+  modulo: "temas",
+  tema: "aulas",
+  aula: null
+};
+
+async function cadeiaDeSuperiores(id) {
+  const cadeia = [];
+  let atual = id;
+  while (atual) {
+    const r = await pool.query(
+      "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
+      [atual]
+    );
+    if (r.rows.length === 0) break;
+    cadeia.unshift(r.rows[0]);
+    atual = r.rows[0].superior_id;
+  }
+  return cadeia;
+}
+
 // Rota: página inicial
 app.get("/", async (req, res) => {
   try {
@@ -48,7 +79,7 @@ app.get("/", async (req, res) => {
   }
 });
 
-// Rota: formulário de criação de unidade
+// Rota: formulário de criação de unidade  ← MOVIDA PARA CIMA
 app.get("/unidades/nova", async (req, res) => {
   const tipo = String(req.query.tipo || "eixo");
   const superiorId = req.query.superior_id ? Number(req.query.superior_id) : null;
@@ -89,14 +120,12 @@ app.post("/unidades/nova", async (req, res) => {
   const descricao = String(req.body.descricao || "").trim() || null;
   const pergunta = String(req.body.pergunta_norteadora || "").trim() || null;
 
-  // 1) Validação básica
   const erros = [];
   if (!TIPOS_VALIDOS.includes(tipo)) erros.push("Tipo inválido.");
   if (!titulo) erros.push("O título é obrigatório.");
   if (tipo !== "tema" && pergunta) erros.push("Pergunta norteadora só existe em tema.");
   if (tipo === "eixo" && superiorId) erros.push("Eixo não tem unidade superior.");
 
-  // 2) Se houver superior, confirmar que ele existe e é do nível certo
   let superior = null;
   if (superiorId) {
     const r = await pool.query(
@@ -107,7 +136,6 @@ app.post("/unidades/nova", async (req, res) => {
       erros.push("Unidade superior não encontrada.");
     } else {
       superior = r.rows[0];
-      // niveis esperados: disciplina -> eixo, modulo -> disciplina, tema -> modulo, aula -> tema
       const esperado = {
         disciplina: "eixo",
         modulo: "disciplina",
@@ -122,7 +150,6 @@ app.post("/unidades/nova", async (req, res) => {
     erros.push(`${ROTULO_TIPO[tipo]} precisa de uma unidade superior.`);
   }
 
-  // 3) Se houver erros, redesenha o formulário com os valores e as mensagens
   if (erros.length > 0) {
     return res.status(400).render("unidade-form", {
       titulo: `Nova ${ROTULO_TIPO[tipo] || "Unidade"}`,
@@ -135,7 +162,6 @@ app.post("/unidades/nova", async (req, res) => {
     });
   }
 
-  // 4) Calcular a ordem (última posição entre os irmãos)
   const ordemR = await pool.query(
     `SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima
        FROM unidades
@@ -145,17 +171,55 @@ app.post("/unidades/nova", async (req, res) => {
   );
   const ordem = ordemR.rows[0].proxima;
 
-  // 5) Inserir
-  const insertR = await pool.query(
+  await pool.query(
     `INSERT INTO unidades
        (tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [tipo, titulo, codigo, superiorId, ordem, descricao, pergunta]
   );
 
-  // 6) Redirecionar para a página inicial (por enquanto)
-  res.redirect("/");
+  if (superiorId) {
+    res.redirect(`/unidades/${superiorId}`);
+  } else {
+    res.redirect("/");
+  }
+});
+
+// Rota: página de uma unidade  ← AGORA DEPOIS DE /nova
+app.get("/unidades/:id", async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id, tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const unidade = r.rows[0];
+
+  const filhosR = await pool.query(
+    "SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 ORDER BY ordem, id",
+    [id]
+  );
+
+  const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
+  const proximo = PROXIMO_NIVEL[unidade.tipo];
+
+  res.render("unidade-detalhe", {
+    titulo: unidade.titulo,
+    unidade,
+    filhos: filhosR.rows,
+    cadeia,
+    rotuloTipo: ROTULO_TIPO[unidade.tipo],
+    proximoNivel: proximo,
+    rotuloProximo: proximo ? ROTULO_TIPO[proximo] : null,
+    nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo]
+  });
 });
 
 // Rota: health

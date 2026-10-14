@@ -139,3 +139,12 @@ footer {
 }
 footer a { color: var(--texto-suave); text-decoration: none; }
 footer a:hover { color: var(--terracota); }
+
+h2 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.aviso-vazio strong {
+  color: var(--marrom);
+}

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= unidade.titulo %> — Literatura Crítica Comparada</title>
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a>
+    <% for (const u of cadeia) { %>
+      › <a href="/unidades/<%= u.id %>"><%= u.titulo %></a>
+    <% } %>
+    › <%= unidade.titulo %>
+  </p>
+
+  <h1><%= unidade.titulo %></h1>
+  <p class="subtitulo">
+    <%= rotuloTipo %><% if (unidade.codigo) { %> · <%= unidade.codigo %><% } %>
+  </p>
+
+  <% if (unidade.descricao) { %>
+    <p><%= unidade.descricao %></p>
+  <% } %>
+
+  <% if (unidade.tipo === 'tema' && unidade.pergunta_norteadora) { %>
+    <div class="aviso-vazio">
+      <strong>Pergunta norteadora:</strong> <%= unidade.pergunta_norteadora %>
+    </div>
+  <% } %>
+
+  <% if (nomeFilhoPlural) { %>
+    <h2 style="font-size: 1.1rem; color: var(--marrom); margin-top: 2rem;">
+      <%= nomeFilhoPlural.charAt(0).toUpperCase() + nomeFilhoPlural.slice(1) %>
+    </h2>
+
+    <% if (filhos.length === 0) { %>
+      <p class="aviso-vazio">
+        Ainda não há <%= nomeFilhoPlural %> aqui.
+      </p>
+    <% } else { %>
+      <ul>
+        <% for (const f of filhos) { %>
+          <li>
+            <% if (f.codigo) { %><strong><%= f.codigo %></strong> — <% } %>
+            <a href="/unidades/<%= f.id %>"><%= f.titulo %></a>
+          </li>
+        <% } %>
+      </ul>
+    <% } %>
+
+    <p style="margin-top: 1.5rem;">
+      <a href="/unidades/nova?tipo=<%= proximoNivel %>&superior_id=<%= unidade.id %>"
+         style="color: var(--terracota);">
+        + Nova <%= rotuloProximo %>
+      </a>
+    </p>
+  <% } %>
+
+  <p style="margin-top: 2rem;">
+    <a href="/unidades/<%= unidade.id %>/editar" style="color: var(--terracota);">Editar</a>
+  </p>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+</body>
+</html>

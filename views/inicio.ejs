@@ -22,11 +22,15 @@
       <% for (const eixo of eixos) { %>
         <li>
           <% if (eixo.codigo) { %><strong><%= eixo.codigo %></strong> — <% } %>
-          <%= eixo.titulo %>
+          <a href="/unidades/<%= eixo.id %>"><%= eixo.titulo %></a>
         </li>
       <% } %>
     </ul>
   <% } %>
+
+  <p style="margin-top: 2rem;">
+    <a href="/unidades/nova" style="color: var(--terracota);">+ Novo eixo</a>
+  </p>
 
   <footer>
     <a href="/health">/health</a>
