@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a>
+    <% if (superior) { %>
+      › <a href="/unidades/<%= superior.id %>"><%= superior.titulo %></a>
+    <% } %>
+    › <a href="/unidades/<%= unidade.id %>"><%= unidade.titulo %></a>
+    › Excluir
+  </p>
+
+  <h1>Excluir <%= rotuloTipo %></h1>
+
+  <% if (typeof erro !== 'undefined' && erro) { %>
+    <div class="erros">
+      <%= erro %>
+    </div>
+  <% } %>
+
+  <p>
+    Você está prestes a excluir:
+    <strong><%= unidade.titulo %></strong>
+    (<%= rotuloTipo %>).
+  </p>
+
+  <% if (filhos.length > 0) { %>
+    <div class="erros">
+      <strong>Não é possível excluir agora.</strong>
+      Esta unidade contém <%= filhos.length %> item(ns):
+      <ul>
+        <% for (const f of filhos) { %>
+          <li><a href="/unidades/<%= f.id %>"><%= f.titulo %></a>
+            (<%= f.tipo %>)</li>
+        <% } %>
+      </ul>
+      Remova ou mova esses itens antes de excluir.
+    </div>
+    <p><a href="/unidades/<%= unidade.id %>" style="color: var(--terracota);">Voltar</a></p>
+  <% } else { %>
+    <p>Esta ação não pode ser desfeita.</p>
+
+    <form method="POST" action="/unidades/<%= unidade.id %>/excluir">
+      <div class="acoes">
+        <button type="submit" style="background: #8f4528;">Excluir definitivamente</button>
+        <a class="caminho cancelar" href="/unidades/<%= unidade.id %>">Cancelar</a>
+      </div>
+    </form>
+  <% } %>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+</body>
+</html>

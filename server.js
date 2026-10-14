@@ -62,7 +62,6 @@ async function cadeiaDeSuperiores(id) {
   return cadeia;
 }
 
-// Rota: página inicial
 app.get("/", async (req, res) => {
   try {
     const r = await pool.query(
@@ -79,7 +78,6 @@ app.get("/", async (req, res) => {
   }
 });
 
-// Rota: formulário de criação
 app.get("/unidades/nova", async (req, res) => {
   const tipo = String(req.query.tipo || "eixo");
   const superiorId = req.query.superior_id ? Number(req.query.superior_id) : null;
@@ -113,7 +111,6 @@ app.get("/unidades/nova", async (req, res) => {
   });
 });
 
-// Rota: processar criação
 app.post("/unidades/nova", async (req, res) => {
   const tipo = String(req.body.tipo || "").trim();
   const superiorId = req.body.superior_id ? Number(req.body.superior_id) : null;
@@ -184,7 +181,6 @@ app.post("/unidades/nova", async (req, res) => {
   }
 });
 
-// Rota: formulário de edição
 app.get("/unidades/:id/editar", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -227,7 +223,6 @@ app.get("/unidades/:id/editar", async (req, res) => {
   });
 });
 
-// Rota: processar edição
 app.post("/unidades/:id/editar", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -291,7 +286,85 @@ app.post("/unidades/:id/editar", async (req, res) => {
   res.redirect(`/unidades/${id}`);
 });
 
-// Rota: página de uma unidade
+// Rota: tela de confirmação de exclusão
+app.get("/unidades/:id/excluir", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const u = r.rows[0];
+
+  const filhosR = await pool.query(
+    "SELECT id, tipo, titulo FROM unidades WHERE superior_id = $1 ORDER BY ordem, id",
+    [id]
+  );
+
+  let superior = null;
+  if (u.superior_id) {
+    const s = await pool.query(
+      "SELECT id, tipo, titulo FROM unidades WHERE id = $1",
+      [u.superior_id]
+    );
+    if (s.rows.length > 0) superior = s.rows[0];
+  }
+
+  res.render("unidade-excluir", {
+    titulo: `Excluir ${u.titulo}`,
+    unidade: u,
+    filhos: filhosR.rows,
+    superior,
+    rotuloTipo: ROTULO_TIPO[u.tipo]
+  });
+});
+
+// Rota: processar exclusão
+app.post("/unidades/:id/excluir", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const u = r.rows[0];
+
+  const filhosR = await pool.query(
+    "SELECT id, tipo, titulo FROM unidades WHERE superior_id = $1",
+    [id]
+  );
+  if (filhosR.rows.length > 0) {
+    return res.status(400).render("unidade-excluir", {
+      titulo: `Excluir ${u.titulo}`,
+      unidade: u,
+      filhos: filhosR.rows,
+      superior: null,
+      rotuloTipo: ROTULO_TIPO[u.tipo],
+      erro: `Esta unidade tem ${filhosR.rows.length} item(ns) dentro. Remova ou mova os filhos antes de excluir.`
+    });
+  }
+
+  await pool.query("DELETE FROM unidades WHERE id = $1", [id]);
+
+  if (u.superior_id) {
+    res.redirect(`/unidades/${u.superior_id}`);
+  } else {
+    res.redirect("/");
+  }
+});
+
 app.get("/unidades/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -327,7 +400,6 @@ app.get("/unidades/:id", async (req, res) => {
   });
 });
 
-// Rota: health
 app.get("/health", async (req, res) => {
   try {
     const r = await pool.query("SELECT COUNT(*)::int AS total FROM unidades");
