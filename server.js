@@ -839,6 +839,38 @@ const ROTULO_ESTADO_VERIFICACAO = {
 // Rota: catálogo de obras
 app.get("/obras", async (req, res) => {
   try {
+    const busca = String(req.query.q || "").trim();
+    const tipoFiltro = String(req.query.tipo || "").trim();
+    const estadoFiltro = String(req.query.estado || "").trim();
+
+    const condicoes = [];
+    const params = [];
+
+    if (busca) {
+      params.push(`%${busca}%`);
+      const p = params.length;
+      condicoes.push(`(
+        o.titulo ILIKE $${p}
+        OR o.titulo_original ILIKE $${p}
+        OR EXISTS (
+          SELECT 1 FROM obras_autores oa
+           WHERE oa.obra_id = o.id AND oa.nome ILIKE $${p}
+        )
+      )`);
+    }
+
+    if (tipoFiltro && ROTULO_TIPO_MATERIAL[tipoFiltro]) {
+      params.push(tipoFiltro);
+      condicoes.push(`o.tipo_material = $${params.length}`);
+    }
+
+    if (estadoFiltro && ROTULO_ESTADO_VERIFICACAO[estadoFiltro]) {
+      params.push(estadoFiltro);
+      condicoes.push(`o.estado_verificacao = $${params.length}`);
+    }
+
+    const where = condicoes.length > 0 ? `WHERE ${condicoes.join(" AND ")}` : "";
+
     const r = await pool.query(
       `SELECT o.id, o.titulo, o.tipo_material, o.estado_verificacao,
               COALESCE(
@@ -849,7 +881,9 @@ app.get("/obras", async (req, res) => {
               (SELECT COUNT(*) FROM edicoes e WHERE e.obra_id = o.id) AS total_edicoes,
               (SELECT COUNT(*) FROM usos u WHERE u.obra_id = o.id) AS total_usos
          FROM obras o
-        ORDER BY o.titulo`
+         ${where}
+        ORDER BY o.titulo`,
+      params
     );
 
     const obras = r.rows.map((o) => ({
@@ -860,7 +894,15 @@ app.get("/obras", async (req, res) => {
 
     res.render("obras-lista", {
       titulo: "Bibliografia",
-      obras
+      obras,
+      filtros: {
+        q: busca,
+        tipo: tipoFiltro,
+        estado: estadoFiltro
+      },
+      temFiltro: Boolean(busca || tipoFiltro || estadoFiltro),
+      tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
+      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
     });
   } catch (err) {
     console.error("Erro na lista de obras:", err.message);

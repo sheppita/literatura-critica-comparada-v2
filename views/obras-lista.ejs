@@ -15,11 +15,48 @@
   <h1>Bibliografia</h1>
   <p class="subtitulo">Catálogo de obras</p>
 
+  <form method="GET" action="/obras" class="filtros-obras">
+    <input type="text" name="q" placeholder="Buscar por título ou autoria..."
+           value="<%= filtros.q %>">
+
+    <select name="tipo">
+      <option value="">Todos os tipos</option>
+      <% for (const [valor, rotulo] of tiposMaterial) { %>
+        <option value="<%= valor %>" <%= filtros.tipo === valor ? 'selected' : '' %>>
+          <%= rotulo %>
+        </option>
+      <% } %>
+    </select>
+
+    <select name="estado">
+      <option value="">Todos os estados</option>
+      <% for (const [valor, rotulo] of estadosVerificacao) { %>
+        <option value="<%= valor %>" <%= filtros.estado === valor ? 'selected' : '' %>>
+          <%= rotulo %>
+        </option>
+      <% } %>
+    </select>
+
+    <button type="submit">Buscar</button>
+    <% if (temFiltro) { %>
+      <a href="/obras" class="botao-ghost">Limpar</a>
+    <% } %>
+  </form>
+
   <% if (obras.length === 0) { %>
     <p class="aviso-vazio">
-      Nenhuma obra cadastrada ainda.
+      <% if (temFiltro) { %>
+        Nenhuma obra encontrada com esses filtros.
+      <% } else { %>
+        Nenhuma obra cadastrada ainda.
+      <% } %>
     </p>
   <% } else { %>
+    <p class="contador-resultados">
+      <%= obras.length %> obra<%= obras.length === 1 ? '' : 's' %>
+      <% if (temFiltro) { %> encontrada<%= obras.length === 1 ? '' : 's' %><% } %>.
+    </p>
+
     <table class="tabela-versoes">
       <thead>
         <tr>
