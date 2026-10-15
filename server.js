@@ -211,7 +211,6 @@ app.post("/unidades/nova", async (req, res) => {
     [tipo, titulo, codigo, superiorId, ordem, descricao, pergunta]
   );
 
-  // Se criou uma aula, cria a ficha em branco automaticamente
   if (tipo === "aula") {
     await pool.query(
       "INSERT INTO fichas (aula_id) VALUES ($1) ON CONFLICT (aula_id) DO NOTHING",
@@ -417,7 +416,6 @@ app.post("/unidades/:id/excluir", async (req, res) => {
   }
 });
 
-// Rota: formulário de edição da ficha
 app.get("/unidades/:id/ficha/editar", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -464,7 +462,6 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
   });
 });
 
-// Rota: processar salvamento da ficha
 app.post("/unidades/:id/ficha/editar", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -517,7 +514,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     });
   }
 
-  // Detecta se houve mudança real (conteúdo, estado do texto ou estado da bibliografia)
   const mudou =
     ficha.conteudo_markdown !== conteudo_markdown ||
     ficha.estado_texto !== estado_texto ||
@@ -526,7 +522,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
   if (mudou) {
     const novaVersao = ficha.versao_atual + 1;
 
-    // Atualiza a ficha
     await pool.query(
       `UPDATE fichas
           SET conteudo_markdown = $1,
@@ -538,26 +533,25 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
       [conteudo_markdown, estado_texto, estado_bibliografia, novaVersao, id]
     );
 
-    // Registra no histórico
     await pool.query(
       `INSERT INTO fichas_versoes
          (ficha_id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia, motivo)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [ficha.id, novaVersao, conteudo_markdown, estado_texto, estado_bibliografia, "Salvamento Manual"]
     );
-  }
 
-  res.redirect(`/unidades/${id}`);
+    res.redirect(`/unidades/${id}?salvo=1`);
+  } else {
+    res.redirect(`/unidades/${id}?salvo=0`);
+  }
 });
 
-// Rota: pré-visualização do Markdown (chamada via fetch do navegador)
 app.post("/unidades/:id/ficha/preview", async (req, res) => {
   const conteudo = String(req.body.conteudo_markdown || "");
   const html = conteudo.trim() ? marked.parse(conteudo) : "<p><em>(vazio)</em></p>";
   res.type("text/html").send(html);
 });
 
-// Rota: lista de versões da ficha
 app.get("/unidades/:id/ficha/versoes", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -611,7 +605,6 @@ app.get("/unidades/:id/ficha/versoes", async (req, res) => {
   });
 });
 
-// Rota: visualizar uma versão específica
 app.get("/unidades/:id/ficha/versoes/:numero", async (req, res) => {
   const id = Number(req.params.id);
   const numero = Number(req.params.numero);
@@ -670,7 +663,6 @@ app.get("/unidades/:id/ficha/versoes/:numero", async (req, res) => {
   });
 });
 
-// Rota: restaurar uma versão
 app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
   const id = Number(req.params.id);
   const numero = Number(req.params.numero);
@@ -736,7 +728,7 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
     ]
   );
 
-  res.redirect(`/unidades/${id}`);
+  res.redirect(`/unidades/${id}?salvo=1`);
 });
 
 app.get("/unidades/:id", async (req, res) => {
@@ -762,7 +754,6 @@ app.get("/unidades/:id", async (req, res) => {
   const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
   const proximo = PROXIMO_NIVEL[unidade.tipo];
 
-  // Se for aula, busca a ficha
   let ficha = null;
   if (unidade.tipo === "aula") {
     const fr = await pool.query(
@@ -785,6 +776,9 @@ app.get("/unidades/:id", async (req, res) => {
     }
   }
 
+  const salvo = req.query.salvo === "1";
+  const nadaMudou = req.query.salvo === "0";
+
   res.render("unidade-detalhe", {
     titulo: unidade.titulo,
     unidade,
@@ -795,7 +789,9 @@ app.get("/unidades/:id", async (req, res) => {
     rotuloProximo: proximo ? ROTULO_TIPO[proximo] : null,
     rotuloNovoProximo: proximo ? ROTULO_NOVO[proximo] : null,
     nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo],
-    ficha
+    ficha,
+    salvo,
+    nadaMudou
   });
 });
 

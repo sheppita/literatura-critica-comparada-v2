@@ -414,3 +414,21 @@ h2 {
 .tabela-versoes tr:hover {
   background: #fbf6e8;
 }
+
+/* Avisos de salvamento */
+.aviso-sucesso {
+  background: #eaf4e2;
+  border-left: 4px solid var(--verde-musgo);
+  padding: 0.85rem 1.1rem;
+  color: #405a2a;
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 1.5rem;
+}
+.aviso-neutro {
+  background: var(--creme-escuro);
+  border-left: 4px solid var(--mostarda);
+  padding: 0.85rem 1.1rem;
+  color: var(--texto);
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 1.5rem;
+}
