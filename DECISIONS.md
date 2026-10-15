@@ -17,8 +17,19 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D11 | Fonte: Quicksand (Google Fonts) | consolidada |
 | D12 | Paleta: cozy autumn (creme, terracota, mostarda, marrom, verde-musgo) | consolidada |
 | D13 | CSS centralizado em `public/estilo.css` | consolidada |
+| D14 | Banner apenas na página inicial; favicon em todas | consolidada |
+| D15 | Descrição existe apenas em eixo, disciplina e módulo. Tema usa pergunta norteadora. Aula terá ficha (Fase 2). | consolidada |
+| D16 | Títulos digitados pela usuária não são capitalizados pelo sistema. Title Case só nos rótulos gerados. | consolidada |
+
+## Regras de trabalho
+
+- **R1:** quando uma alteração envolve mais de um ponto no mesmo arquivo, o arquivo inteiro é enviado.
+- **R2:** quando envolve mais de um arquivo, todos os arquivos inteiros são enviados de uma vez.
+- **R3:** em caso de erro, não mexer em nada antes de colar a mensagem exata e aguardar investigação.
+- **R4:** nada é apagado do banco, repositório ou serviços sem explicação de consequências e cópia de segurança.
 
 ## Observações
 
 - O banco do Neon se chama `neondb` dentro do projeto `literatura-critica-comparada-v2`.
 - O protótipo antigo permanece arquivado em repositório separado.
+- Restrição no banco: `descricao_apenas_em_eixo_disciplina_modulo` (adicionada em out/2026).
