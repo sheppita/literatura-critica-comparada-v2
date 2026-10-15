@@ -17,8 +17,8 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D11 | Fonte: Quicksand (Google Fonts) | consolidada |
 | D12 | Paleta: cozy autumn (creme, terracota, mostarda, marrom, verde-musgo) | consolidada |
 | D13 | CSS centralizado em `public/estilo.css` | consolidada |
-| D14 | Banner apenas na página inicial; favicon em todas | consolidada |
-| D15 | Descrição existe apenas em eixo, disciplina e módulo. Tema usa pergunta norteadora. Aula terá ficha (Fase 2). | consolidada |
+| D14 | Banner apenas na página inicial; favicon em todas | substituída por D44 |
+| D15 | Descrição existe apenas em eixo, disciplina e módulo. Tema usa pergunta norteadora. Aula terá ficha. | consolidada |
 | D16 | Títulos digitados pela usuária não são capitalizados pelo sistema. Title Case só nos rótulos gerados. | consolidada |
 | D17 | Tabelas `fichas` e `fichas_versoes` (1-para-1 com aula) | consolidada |
 | D18 | Toda aula tem ficha em branco desde a criação | consolidada |
@@ -38,6 +38,21 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D32 | Aviso de decisão possivelmente vencida aparece na página da obra | consolidada |
 | D33 | Tela de mesclagem em `/obras/mesclar` (tela separada) | consolidada |
 | D34 | Registrar decisão também atualiza o estado de revisão dos usos envolvidos | consolidada |
+| D35 | Excluir edição em uso: bloquear com mensagem clara | consolidada |
+| D36 | Excluir edição sem uso: exclusão direta com confirmação | consolidada |
+| D37 | Editar obra: apagar e reinserir os autores | consolidada |
+| D38 | Editar uso: apagar e reinserir os recortes | consolidada |
+| D39 | Ordenação dos usos por papel (texto-base → texto complementar → ficção-âncora → ficção complementar) | consolidada |
+| D40 | Papéis e modalidade: leitura parcial sem recorte é pendência | consolidada |
+| D41 | Caminho curricular completo exibido em cada uso na página da obra | consolidada |
+| D42 | "Edição não informada" e "Recorte não informado" exibidos explicitamente | consolidada |
+| D43 | Regra de omissão do tipo: se o código começa com o nome do tipo, mostra só o código | consolidada |
+| D44 | Banner removido; barra fixa no topo em todas as páginas | consolidada |
+| D45 | Botão "+ Aula" leva a uma tela intermediária de escolha de tema (lista agrupada com busca) | consolidada |
+| D46 | Botões flutuantes "ir pro topo/fundo": desativados em telas < 600px; ⬇️ desaparece quando está no fundo | consolidada |
+| D47 | Texto da ficha justificado em telas ≥ 700px, com hifenização automática | consolidada |
+| D48 | Capa da edição por URL (sem upload); exibida em obra, aula e catálogo | consolidada |
+| D49 | No catálogo, capa exibida é a da edição mais recente (por ano) | consolidada |
 
 ## Regras de trabalho
 
@@ -46,10 +61,12 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 - **R3:** em caso de erro, não mexer em nada antes de colar a mensagem exata e aguardar investigação.
 - **R4:** nada é apagado do banco, repositório ou serviços sem explicação de consequências e cópia de segurança.
 - **R5:** ao final de cada fase, os arquivos `DECISIONS.md` e `STATUS.md` são atualizados e commitados.
-- **R6:** quando o volume crescer, o padrão de "busca com autocomplete no servidor" substitui os `<select>` com listas grandes (ver pendência do Pacote 2).
+- **R6:** quando o volume crescer, o padrão de "busca com autocomplete no servidor" substitui os `<select>` com listas grandes.
+- **R7:** arquivos de código são enviados **inteiros**, sempre. Exceções: `estilo.css` (aditivo) e SQL (executado por comando). A preferência da usuária é o padrão.
 
 ## Observações
 
 - O banco do Neon se chama `neondb` dentro do projeto `literatura-critica-comparada-v2`.
 - O protótipo antigo permanece arquivado em repositório separado.
 - Restrição no banco: `descricao_apenas_em_eixo_disciplina_modulo` (adicionada em out/2026).
+- Coluna `capa_url` em `edicoes` (adicionada em out/2026).

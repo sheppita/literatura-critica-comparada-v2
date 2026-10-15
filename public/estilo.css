@@ -946,3 +946,10 @@ body {
     width: 56px;
   }
 }
+/* Texto justificado na ficha da aula (só em telas largas) */
+@media (min-width: 700px) {
+  .ficha-conteudo {
+    text-align: justify;
+    hyphens: auto;
+  }
+}
