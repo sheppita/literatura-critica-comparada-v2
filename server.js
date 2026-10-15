@@ -83,6 +83,33 @@ const ROTULO_ESTADO_VERIFICACAO = {
   incompleta: "Incompleta"
 };
 
+const ROTULO_PAPEL = {
+  texto_base: "Texto-Base",
+  texto_complementar: "Texto Complementar",
+  ficcao_ancora: "Ficção-Âncora",
+  ficcao_complementar: "Ficção Complementar"
+};
+
+const ROTULO_MODALIDADE = {
+  integral: "Obra Integral",
+  parcial: "Leitura Parcial"
+};
+
+const ROTULO_ESTADO_REVISAO = {
+  a_avaliar: "A Avaliar",
+  repeticao_validada: "Repetição Validada",
+  substituicao_planejada: "Substituição Planejada",
+  resolvida: "Resolvida"
+};
+
+const ROTULO_RECORTE_TIPO = {
+  capitulo: "Capítulo",
+  secao: "Seção",
+  paginas: "Páginas",
+  integral: "Obra Integral",
+  a_conferir: "A Conferir"
+};
+
 function aceitaDescricao(tipo) {
   return TIPOS_COM_DESCRICAO.includes(tipo);
 }
@@ -812,18 +839,62 @@ app.get("/obras", async (req, res) => {
                 ''
               ) AS autores,
               (SELECT COUNT(*) FROM edicoes e WHERE e.obra_id = o.id) AS total_edicoes,
-              (SELECT COUNT(*) FROM usos u WHERE u.obra_id = o.id) AS total_usos
+              (SELECT COUNT(DISTINCT u.aula_id) FROM usos u WHERE u.obra_id = o.id) AS total_aulas_distintas,
+              (
+                SELECT STRING_AGG(DISTINCT titulo_eixo, ' · ')
+                  FROM (
+                    SELECT COALESCE(eixo.titulo, 'Sem eixo') AS titulo_eixo
+                      FROM usos u
+                      JOIN unidades aula ON aula.id = u.aula_id
+                      LEFT JOIN unidades tema ON tema.id = aula.superior_id
+                      LEFT JOIN unidades modulo ON modulo.id = tema.superior_id
+                      LEFT JOIN unidades disciplina ON disciplina.id = modulo.superior_id
+                      LEFT JOIN unidades eixo ON eixo.id = disciplina.superior_id
+                     WHERE u.obra_id = o.id
+                  ) sub
+              ) AS eixos,
+              (
+                SELECT jsonb_object_agg(estado_revisao, total)
+                  FROM (
+                    SELECT estado_revisao, COUNT(*) AS total
+                      FROM usos u
+                     WHERE u.obra_id = o.id
+                     GROUP BY estado_revisao
+                  ) sub2
+              ) AS estados_revisao_contagem,
+              EXISTS (
+                SELECT 1
+                  FROM usos u
+                  LEFT JOIN usos_recortes r ON r.uso_id = u.id
+                 WHERE u.obra_id = o.id
+                   AND (
+                     u.edicao_id IS NULL
+                     OR r.tipo = 'a_conferir'
+                   )
+              ) AS tem_pendencia
          FROM obras o
          ${where}
         ORDER BY o.titulo`,
       params
     );
 
-    const obras = r.rows.map((o) => ({
-      ...o,
-      rotuloTipoMaterial: ROTULO_TIPO_MATERIAL[o.tipo_material] || o.tipo_material,
-      rotuloEstadoVerificacao: ROTULO_ESTADO_VERIFICACAO[o.estado_verificacao] || o.estado_verificacao
-    }));
+    const obras = r.rows.map((o) => {
+      const estados = o.estados_revisao_contagem || {};
+      const resumoEstados = Object.entries(estados)
+        .map(([estado, total]) => {
+          const rotulo = ROTULO_ESTADO_REVISAO[estado] || estado;
+          const rotuloMinusculo = rotulo.charAt(0).toLowerCase() + rotulo.slice(1);
+          return `${total} ${rotuloMinusculo}`;
+        })
+        .join(", ");
+
+      return {
+        ...o,
+        rotuloTipoMaterial: ROTULO_TIPO_MATERIAL[o.tipo_material] || o.tipo_material,
+        rotuloEstadoVerificacao: ROTULO_ESTADO_VERIFICACAO[o.estado_verificacao] || o.estado_verificacao,
+        resumoEstados
+      };
+    });
 
     res.render("obras-lista", {
       titulo: "Bibliografia",
@@ -1065,7 +1136,10 @@ app.get("/obras/:id", async (req, res) => {
 
   const usos = usosR.rows.map((u) => ({
     ...u,
-    recortes: recortesPorUso[u.id] || []
+    recortes: recortesPorUso[u.id] || [],
+    rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
+    rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
+    rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao
   }));
 
   res.render("obra-detalhe", {
@@ -1078,6 +1152,261 @@ app.get("/obras/:id", async (req, res) => {
 });
 
 // ----- Fim das rotas de bibliografia -----
+
+// ----- Rotas de uso (obra em aula) -----
+
+app.get("/unidades/:id/usos/novo", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const ur = await pool.query(
+    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (ur.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const aula = ur.rows[0];
+  if (aula.tipo !== "aula") {
+    return res.status(400).type("text/plain").send("Só aulas recebem usos.");
+  }
+
+  const or = await pool.query(
+    `SELECT o.id, o.titulo,
+            COALESCE(
+              (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                 FROM obras_autores oa WHERE oa.obra_id = o.id),
+              ''
+            ) AS autores
+       FROM obras o
+      ORDER BY o.titulo`
+  );
+
+  const obraPre = req.query.obra_id ? Number(req.query.obra_id) : null;
+
+  let edicoes = [];
+  if (obraPre) {
+    const er = await pool.query(
+      `SELECT id, editora, ano, numero_edicao, idioma
+         FROM edicoes WHERE obra_id = $1
+        ORDER BY ano NULLS LAST, id`,
+      [obraPre]
+    );
+    edicoes = er.rows;
+  }
+
+  const cadeia = await cadeiaDeSuperiores(aula.superior_id);
+
+  res.render("uso-form", {
+    titulo: `Adicionar Obra — ${aula.titulo}`,
+    aula,
+    cadeia,
+    obras: or.rows,
+    edicoes,
+    valores: {
+      obra_id: obraPre ? String(obraPre) : "",
+      edicao_id: "",
+      papel: "texto_base",
+      modalidade: "parcial",
+      orientacao: "",
+      observacoes: "",
+      estado_revisao: "a_avaliar",
+      recortes: [
+        { rotulo: "", tipo: "capitulo", inicio: "", fim: "", observacao: "" }
+      ]
+    },
+    erros: [],
+    modo: "criar",
+    papeis: Object.entries(ROTULO_PAPEL),
+    modalidades: Object.entries(ROTULO_MODALIDADE),
+    estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO),
+    tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
+  });
+});
+
+app.get("/obras/:id/edicoes.json", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ erro: "Id inválido." });
+  }
+  const r = await pool.query(
+    `SELECT id, editora, ano, numero_edicao, idioma
+       FROM edicoes WHERE obra_id = $1
+      ORDER BY ano NULLS LAST, id`,
+    [id]
+  );
+  res.json({ edicoes: r.rows });
+});
+
+app.post("/unidades/:id/usos/novo", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const ur = await pool.query(
+    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (ur.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const aula = ur.rows[0];
+  if (aula.tipo !== "aula") {
+    return res.status(400).type("text/plain").send("Só aulas recebem usos.");
+  }
+
+  const obra_id = Number(req.body.obra_id) || null;
+  const edicao_id = Number(req.body.edicao_id) || null;
+  const papel = String(req.body.papel || "").trim();
+  const modalidade = String(req.body.modalidade || "").trim();
+  const orientacao = String(req.body.orientacao || "").trim() || null;
+  const observacoes = String(req.body.observacoes || "").trim() || null;
+  const estado_revisao = String(req.body.estado_revisao || "").trim();
+
+  const rotulos = [].concat(req.body["recorte_rotulo[]"] || []);
+  const tipos = [].concat(req.body["recorte_tipo[]"] || []);
+  const inicios = [].concat(req.body["recorte_inicio[]"] || []);
+  const fins = [].concat(req.body["recorte_fim[]"] || []);
+  const observacoesRec = [].concat(req.body["recorte_observacao[]"] || []);
+
+  const erros = [];
+  if (!obra_id) erros.push("Escolha uma obra.");
+  if (!ROTULO_PAPEL[papel]) erros.push("Papel inválido.");
+  if (!ROTULO_MODALIDADE[modalidade]) erros.push("Modalidade inválida.");
+  if (!ROTULO_ESTADO_REVISAO[estado_revisao]) erros.push("Estado de revisão inválido.");
+
+  if (obra_id) {
+    const o = await pool.query("SELECT id FROM obras WHERE id = $1", [obra_id]);
+    if (o.rows.length === 0) erros.push("Obra não encontrada.");
+  }
+
+  if (edicao_id) {
+    const e = await pool.query("SELECT id, obra_id FROM edicoes WHERE id = $1", [edicao_id]);
+    if (e.rows.length === 0) {
+      erros.push("Edição não encontrada.");
+    } else if (e.rows[0].obra_id !== obra_id) {
+      erros.push("A edição não pertence à obra selecionada.");
+    }
+  }
+
+  const recortes = [];
+  for (let i = 0; i < tipos.length; i++) {
+    const tipo = String(tipos[i] || "").trim();
+    if (!ROTULO_RECORTE_TIPO[tipo]) continue;
+    const rotulo = String(rotulos[i] || "").trim() || null;
+    const inicio = String(inicios[i] || "").trim() || null;
+    const fim = String(fins[i] || "").trim() || null;
+    const observacao = String(observacoesRec[i] || "").trim() || null;
+    if (!rotulo && !inicio && !fim && !observacao && tipo !== "integral" && tipo !== "a_conferir") {
+      continue;
+    }
+    recortes.push({ rotulo, tipo, inicio, fim, observacao });
+  }
+
+  if (erros.length > 0) {
+    const or = await pool.query(
+      `SELECT o.id, o.titulo,
+              COALESCE(
+                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                   FROM obras_autores oa WHERE oa.obra_id = o.id),
+                ''
+              ) AS autores
+         FROM obras o
+        ORDER BY o.titulo`
+    );
+    let edicoes = [];
+    if (obra_id) {
+      const er = await pool.query(
+        `SELECT id, editora, ano, numero_edicao, idioma
+           FROM edicoes WHERE obra_id = $1
+          ORDER BY ano NULLS LAST, id`,
+        [obra_id]
+      );
+      edicoes = er.rows;
+    }
+    const cadeia = await cadeiaDeSuperiores(aula.superior_id);
+    return res.status(400).render("uso-form", {
+      titulo: `Adicionar Obra — ${aula.titulo}`,
+      aula,
+      cadeia,
+      obras: or.rows,
+      edicoes,
+      valores: {
+        obra_id: obra_id ? String(obra_id) : "",
+        edicao_id: edicao_id ? String(edicao_id) : "",
+        papel, modalidade, orientacao: orientacao || "",
+        observacoes: observacoes || "",
+        estado_revisao,
+        recortes: recortes.length > 0 ? recortes : [
+          { rotulo: "", tipo: "capitulo", inicio: "", fim: "", observacao: "" }
+        ]
+      },
+      erros,
+      modo: "criar",
+      papeis: Object.entries(ROTULO_PAPEL),
+      modalidades: Object.entries(ROTULO_MODALIDADE),
+      estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO),
+      tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const usoR = await client.query(
+      `INSERT INTO usos
+         (aula_id, obra_id, edicao_id, papel, modalidade, orientacao, observacoes, estado_revisao)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [id, obra_id, edicao_id, papel, modalidade, orientacao, observacoes, estado_revisao]
+    );
+    const usoId = usoR.rows[0].id;
+
+    for (let i = 0; i < recortes.length; i++) {
+      const r = recortes[i];
+      await client.query(
+        `INSERT INTO usos_recortes (uso_id, rotulo, tipo, inicio, fim, observacao, ordem)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [usoId, r.rotulo, r.tipo, r.inicio, r.fim, r.observacao, i + 1]
+      );
+    }
+
+    await client.query("COMMIT");
+    res.redirect(`/unidades/${id}?salvo=1`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao criar uso:", err.message);
+    res.status(500).type("text/plain").send("Erro interno ao salvar. Nada foi gravado.");
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/unidades/:id/usos/:uso_id/excluir", async (req, res) => {
+  const id = Number(req.params.id);
+  const usoId = Number(req.params.uso_id);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(usoId) || usoId <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id FROM usos WHERE id = $1 AND aula_id = $2",
+    [usoId, id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Uso não encontrado.");
+  }
+
+  await pool.query("DELETE FROM usos WHERE id = $1", [usoId]);
+
+  res.redirect(`/unidades/${id}?salvo=1`);
+});
+
+// ----- Fim das rotas de uso -----
 
 app.get("/unidades/:id", async (req, res) => {
   const id = Number(req.params.id);
@@ -1124,6 +1453,51 @@ app.get("/unidades/:id", async (req, res) => {
     }
   }
 
+  let usosAula = [];
+  if (unidade.tipo === "aula") {
+    const ua = await pool.query(
+      `SELECT u.id, u.obra_id, u.edicao_id, u.papel, u.modalidade,
+              u.orientacao, u.observacoes, u.estado_revisao,
+              o.titulo AS obra_titulo,
+              COALESCE(
+                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                   FROM obras_autores oa WHERE oa.obra_id = o.id),
+                ''
+              ) AS obra_autores,
+              e.id AS edicao_id_ref, e.editora AS edicao_editora, e.ano AS edicao_ano
+         FROM usos u
+         JOIN obras o ON o.id = u.obra_id
+         LEFT JOIN edicoes e ON e.id = u.edicao_id
+        WHERE u.aula_id = $1
+        ORDER BY o.titulo`,
+      [id]
+    );
+
+    const usoIds = ua.rows.map((u) => u.id);
+    let recortesPorUso = {};
+    if (usoIds.length > 0) {
+      const rr = await pool.query(
+        `SELECT id, uso_id, rotulo, tipo, inicio, fim, observacao, ordem
+           FROM usos_recortes
+          WHERE uso_id = ANY($1::bigint[])
+          ORDER BY uso_id, ordem, id`,
+        [usoIds]
+      );
+      for (const r of rr.rows) {
+        if (!recortesPorUso[r.uso_id]) recortesPorUso[r.uso_id] = [];
+        recortesPorUso[r.uso_id].push(r);
+      }
+    }
+
+    usosAula = ua.rows.map((u) => ({
+      ...u,
+      recortes: recortesPorUso[u.id] || [],
+      rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
+      rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
+      rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao
+    }));
+  }
+
   const salvo = req.query.salvo === "1";
   const nadaMudou = req.query.salvo === "0";
 
@@ -1138,6 +1512,7 @@ app.get("/unidades/:id", async (req, res) => {
     rotuloNovoProximo: proximo ? ROTULO_NOVO[proximo] : null,
     nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo],
     ficha,
+    usosAula,
     salvo,
     nadaMudou
   });

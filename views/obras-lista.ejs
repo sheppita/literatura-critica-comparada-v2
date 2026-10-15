@@ -57,26 +57,54 @@
       <% if (temFiltro) { %> encontrada<%= obras.length === 1 ? '' : 's' %><% } %>.
     </p>
 
-    <table class="tabela-versoes">
+    <table class="tabela-versoes tabela-obras">
       <thead>
         <tr>
-          <th>Título</th>
-          <th>Autoria</th>
-          <th>Tipo</th>
+          <th>Título / Autoria</th>
+          <th>Aparece em</th>
+          <th>Eixos</th>
+          <th>Revisão</th>
           <th>Edições</th>
-          <th>Usos</th>
-          <th>Verificação</th>
         </tr>
       </thead>
       <tbody>
         <% for (const o of obras) { %>
           <tr>
-            <td><strong><a href="/obras/<%= o.id %>"><%= o.titulo %></a></strong></td>
-            <td><%= o.autores || '—' %></td>
-            <td><%= o.rotuloTipoMaterial %></td>
+            <td>
+              <strong><a href="/obras/<%= o.id %>"><%= o.titulo %></a></strong>
+              <% if (o.tem_pendencia) { %>
+                <span class="icone-pendencia" title="Há uso com edição não especificada ou recorte a conferir">⚠</span>
+              <% } %>
+              <% if (o.autores) { %>
+                <div class="detalhe-suave"><%= o.autores %></div>
+              <% } %>
+              <div class="detalhe-suave">
+                <%= o.rotuloTipoMaterial %> · Verificação: <%= o.rotuloEstadoVerificacao %>
+              </div>
+            </td>
+            <td>
+              <% if (o.total_aulas_distintas === 0) { %>
+                <span class="detalhe-suave">—</span>
+              <% } else { %>
+                <%= o.total_aulas_distintas %>
+                aula<%= o.total_aulas_distintas === 1 ? '' : 's' %>
+              <% } %>
+            </td>
+            <td>
+              <% if (o.eixos) { %>
+                <%= o.eixos %>
+              <% } else { %>
+                <span class="detalhe-suave">—</span>
+              <% } %>
+            </td>
+            <td>
+              <% if (o.resumoEstados) { %>
+                <%= o.resumoEstados %>
+              <% } else { %>
+                <span class="detalhe-suave">—</span>
+              <% } %>
+            </td>
             <td><%= o.total_edicoes %></td>
-            <td><%= o.total_usos %></td>
-            <td><%= o.rotuloEstadoVerificacao %></td>
           </tr>
         <% } %>
       </tbody>

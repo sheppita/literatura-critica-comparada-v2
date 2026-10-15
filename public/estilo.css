@@ -541,3 +541,80 @@ h2 {
   font-size: 0.9rem;
   margin-top: 0.25rem;
 }
+
+/* Formulário de uso */
+.bloco-recortes {
+  border: 1px solid #d8c9a8;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  background: #fffdf7;
+}
+.bloco-recortes legend {
+  font-weight: 700;
+  color: var(--marrom);
+  padding: 0 0.5rem;
+}
+
+.recorte-linha {
+  display: grid;
+  grid-template-columns: 130px 1fr 80px 80px 1fr 36px;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.recorte-linha select,
+.recorte-linha input {
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.recorte-linha .btn-remover-recorte {
+  padding: 0.35rem 0.6rem;
+  font-size: 1rem;
+  line-height: 1;
+  min-width: 0;
+}
+
+/* Lista de usos na página da aula */
+.lista-usos-aula {
+  list-style: none;
+  padding-left: 0;
+}
+.uso-aula-item {
+  background: var(--creme-escuro);
+  border-left: 4px solid var(--mostarda);
+  border-radius: 0 6px 6px 0;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.7rem;
+}
+.uso-aula-item .uso-cabecalho {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.uso-aula-item .uso-obra {
+  font-weight: 700;
+  color: var(--marrom);
+}
+.uso-aula-item .uso-acoes {
+  font-size: 0.85rem;
+}
+/* Catálogo enriquecido */
+.tabela-obras td {
+  vertical-align: top;
+}
+
+.icone-pendencia {
+  display: inline-block;
+  margin-left: 0.3rem;
+  color: var(--terracota);
+  font-size: 1rem;
+  cursor: help;
+  font-weight: 700;
+}

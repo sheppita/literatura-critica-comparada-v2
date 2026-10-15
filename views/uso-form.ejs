@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a>
+    <% for (const u of cadeia) { %>
+      › <a href="/unidades/<%= u.id %>"><%= u.titulo %></a>
+    <% } %>
+    › <a href="/unidades/<%= aula.id %>"><%= aula.titulo %></a>
+    › Adicionar Obra
+  </p>
+
+  <h1>Adicionar Obra</h1>
+  <p class="subtitulo">Aula: <%= aula.titulo %></p>
+
+  <% if (erros && erros.length > 0) { %>
+    <div class="erros">
+      <strong>Não foi possível salvar:</strong>
+      <ul>
+        <% for (const e of erros) { %>
+          <li><%= e %></li>
+        <% } %>
+      </ul>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/unidades/<%= aula.id %>/usos/novo" id="form-uso">
+    <label for="obra_id">Obra</label>
+    <select id="obra_id" name="obra_id">
+      <option value="">— Escolha uma obra —</option>
+      <% for (const o of obras) { %>
+        <option value="<%= o.id %>" <%= valores.obra_id === String(o.id) ? 'selected' : '' %>>
+          <%= o.titulo %><% if (o.autores) { %> — <%= o.autores %><% } %>
+        </option>
+      <% } %>
+    </select>
+    <% if (obras.length === 0) { %>
+      <p class="detalhe-suave">
+        Nenhuma obra cadastrada. <a href="/obras/nova">Cadastrar uma agora</a>.
+      </p>
+    <% } %>
+
+    <label for="edicao_id">Edição <span class="ajuda">(opcional; deixe em branco se não souber)</span></label>
+    <select id="edicao_id" name="edicao_id">
+      <option value="">— Edição não especificada —</option>
+      <% for (const e of edicoes) { %>
+        <option value="<%= e.id %>" <%= valores.edicao_id === String(e.id) ? 'selected' : '' %>>
+          <%= e.editora || '—' %><% if (e.ano) { %>, <%= e.ano %><% } %><% if (e.numero_edicao) { %> (<%= e.numero_edicao %>)<% } %>
+        </option>
+      <% } %>
+    </select>
+
+    <label for="papel">Papel</label>
+    <select id="papel" name="papel">
+      <% for (const [valor, rotulo] of papeis) { %>
+        <option value="<%= valor %>" <%= valores.papel === valor ? 'selected' : '' %>><%= rotulo %></option>
+      <% } %>
+    </select>
+
+    <label for="modalidade">Modalidade</label>
+    <select id="modalidade" name="modalidade">
+      <% for (const [valor, rotulo] of modalidades) { %>
+        <option value="<%= valor %>" <%= valores.modalidade === valor ? 'selected' : '' %>><%= rotulo %></option>
+      <% } %>
+    </select>
+
+    <label for="estado_revisao">Estado de revisão</label>
+    <select id="estado_revisao" name="estado_revisao">
+      <% for (const [valor, rotulo] of estadosRevisao) { %>
+        <option value="<%= valor %>" <%= valores.estado_revisao === valor ? 'selected' : '' %>><%= rotulo %></option>
+      <% } %>
+    </select>
+
+    <fieldset class="bloco-recortes">
+      <legend>Recortes <span class="ajuda">(capítulos, páginas, seções)</span></legend>
+      <p class="detalhe-suave">
+        Deixe em branco se a obra for integral. Use "A Conferir" se ainda não sabe.
+      </p>
+
+      <div id="lista-recortes">
+        <% for (const r of valores.recortes) { %>
+          <div class="recorte-linha">
+            <select name="recorte_tipo[]">
+              <% for (const [valor, rotulo] of tiposRecorte) { %>
+                <option value="<%= valor %>" <%= r.tipo === valor ? 'selected' : '' %>><%= rotulo %></option>
+              <% } %>
+            </select>
+            <input type="text" name="recorte_rotulo[]" placeholder="Rótulo (ex.: Cap. 3)" value="<%= r.rotulo %>">
+            <input type="text" name="recorte_inicio[]" placeholder="Início" value="<%= r.inicio %>">
+            <input type="text" name="recorte_fim[]" placeholder="Fim" value="<%= r.fim %>">
+            <input type="text" name="recorte_observacao[]" placeholder="Observação" value="<%= r.observacao %>">
+            <button type="button" class="btn-remover-recorte botao-ghost">×</button>
+          </div>
+        <% } %>
+      </div>
+
+      <p>
+        <button type="button" id="btn-add-recorte" class="botao-ghost">+ Adicionar Recorte</button>
+      </p>
+    </fieldset>
+
+    <label for="orientacao">Orientação / justificativa <span class="ajuda">(opcional)</span></label>
+    <textarea id="orientacao" name="orientacao"><%= valores.orientacao %></textarea>
+
+    <label for="observacoes">Observações <span class="ajuda">(opcional)</span></label>
+    <textarea id="observacoes" name="observacoes"><%= valores.observacoes %></textarea>
+
+    <div class="acoes">
+      <button type="submit">Salvar</button>
+      <a class="botao-ghost" href="/unidades/<%= aula.id %>">Cancelar</a>
+    </div>
+  </form>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+
+  <script>
+    (function () {
+      const selectObra = document.getElementById("obra_id");
+      const selectEdicao = document.getElementById("edicao_id");
+      const listaRecortes = document.getElementById("lista-recortes");
+      const btnAdd = document.getElementById("btn-add-recorte");
+
+      // Carrega edições da obra selecionada
+      async function carregarEdicoes() {
+        const obraId = selectObra.value;
+        selectEdicao.innerHTML = '<option value="">— Edição não especificada —</option>';
+        if (!obraId) return;
+        try {
+          const r = await fetch("/obras/" + obraId + "/edicoes.json");
+          const dados = await r.json();
+          for (const e of dados.edicoes) {
+            const opt = document.createElement("option");
+            opt.value = e.id;
+            let rotulo = e.editora || "—";
+            if (e.ano) rotulo += ", " + e.ano;
+            if (e.numero_edicao) rotulo += " (" + e.numero_edicao + ")";
+            opt.textContent = rotulo;
+            selectEdicao.appendChild(opt);
+          }
+        } catch (err) {
+          // silencioso
+        }
+      }
+
+      selectObra.addEventListener("change", carregarEdicoes);
+      // Se já havia uma obra selecionada (recarregamento pós-erro), carrega edições
+      if (selectObra.value) carregarEdicoes();
+
+      // Adicionar recorte
+      btnAdd.addEventListener("click", () => {
+        const div = document.createElement("div");
+        div.className = "recorte-linha";
+        div.innerHTML = `
+          <select name="recorte_tipo[]">
+            <% for (const [valor, rotulo] of tiposRecorte) { %>
+              <option value="<%= valor %>"><%= rotulo %></option>
+            <% } %>
+          </select>
+          <input type="text" name="recorte_rotulo[]" placeholder="Rótulo (ex.: Cap. 3)">
+          <input type="text" name="recorte_inicio[]" placeholder="Início">
+          <input type="text" name="recorte_fim[]" placeholder="Fim">
+          <input type="text" name="recorte_observacao[]" placeholder="Observação">
+          <button type="button" class="btn-remover-recorte botao-ghost">×</button>
+        `;
+        listaRecortes.appendChild(div);
+      });
+
+      // Remover recorte
+      listaRecortes.addEventListener("click", (e) => {
+        if (e.target.classList.contains("btn-remover-recorte")) {
+          const linha = e.target.closest(".recorte-linha");
+          if (linha && listaRecortes.children.length > 1) {
+            linha.remove();
+          }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
