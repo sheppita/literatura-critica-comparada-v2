@@ -114,6 +114,17 @@ function aceitaDescricao(tipo) {
   return TIPOS_COM_DESCRICAO.includes(tipo);
 }
 
+function rotuloTipoOuOmissao(tipo, codigo) {
+  const rotulo = ROTULO_TIPO[tipo] || tipo;
+  if (!codigo) return rotulo;
+  const codigoUpper = String(codigo).toUpperCase();
+  const rotuloUpper = String(rotulo).toUpperCase();
+  if (codigoUpper.startsWith(rotuloUpper)) {
+    return null;
+  }
+  return rotulo;
+}
+
 async function cadeiaDeSuperiores(id) {
   const cadeia = [];
   let atual = id;
@@ -127,23 +138,6 @@ async function cadeiaDeSuperiores(id) {
     atual = r.rows[0].superior_id;
   }
   return cadeia;
-}
-
-async function caminhoCurricularDaAula(aulaId) {
-  const cadeia = await cadeiaDeSuperiores(aulaId);
-  return cadeia.map((u) => u.titulo).join(" › ");
-}
-
-
-function rotuloTipoOuOmissao(tipo, codigo) {
-  const rotulo = ROTULO_TIPO[tipo] || tipo;
-  if (!codigo) return rotulo;
-  const codigoUpper = String(codigo).toUpperCase();
-  const rotuloUpper = String(rotulo).toUpperCase();
-  if (codigoUpper.startsWith(rotuloUpper)) {
-    return null; // omite o tipo
-  }
-  return rotulo;
 }
 
 app.get("/", async (req, res) => {
@@ -305,10 +299,6 @@ app.get("/unidades/:id/editar", async (req, res) => {
     );
     if (s.rows.length > 0) superior = s.rows[0];
   }
-
-    // #14: rótulo do tipo, omitido quando o código começa com ele
-  const rotuloTipoExibido = rotuloTipoOuOmissao(unidade.tipo, unidade.codigo);
-
 
   res.render("unidade-form", {
     titulo: `Editar ${ROTULO_TIPO[u.tipo]}`,
@@ -482,7 +472,6 @@ app.post("/unidades/:id/excluir", async (req, res) => {
 app.get("/aulas/nova", async (req, res) => {
   const busca = String(req.query.q || "").trim();
 
-  // Busca todos os temas, com sua cadeia de superiores
   const temasR = await pool.query(
     `SELECT
         t.id AS tema_id, t.titulo AS tema_titulo, t.codigo AS tema_codigo,
@@ -497,7 +486,6 @@ app.get("/aulas/nova", async (req, res) => {
       ORDER BY e.ordem, e.titulo, d.ordem, d.titulo, m.ordem, m.titulo, t.ordem, t.titulo`
   );
 
-  // Filtro por busca (em memória — a lista de temas não é gigante)
   let temas = temasR.rows;
   if (busca) {
     const b = busca.toLowerCase();
@@ -510,7 +498,6 @@ app.get("/aulas/nova", async (req, res) => {
     );
   }
 
-  // Agrupa por eixo → disciplina → módulo → [temas]
   const porEixo = new Map();
   for (const t of temas) {
     if (!porEixo.has(t.eixo_id)) {
@@ -543,7 +530,6 @@ app.get("/aulas/nova", async (req, res) => {
     });
   }
 
-  // Converte Maps para arrays (mais fácil de iterar no template)
   const estrutura = Array.from(porEixo.values()).map((e) => ({
     ...e,
     disciplinas: Array.from(e.disciplinas.values()).map((d) => ({
@@ -559,7 +545,6 @@ app.get("/aulas/nova", async (req, res) => {
     totalTemas: temas.length
   });
 });
-
 
 // ----- Rotas de ficha -----
 
@@ -656,7 +641,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     erros.push("Ficha não encontrada para esta aula.");
   }
 
-  // Função auxiliar: renderiza o editor preservando o que veio no body
   async function renderizarEditorComErros(mensagens, conflitoAtivo) {
     const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
     return res.status(400).render("ficha-editor", {
@@ -680,10 +664,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     return renderizarEditorComErros(erros, null);
   }
 
-  // F2: verificação atômica de versão. Se a versão que a usuária abriu
-  // não for mais a atual, e não foi forçado, é conflito.
-  // F1: em vez de redirecionar (que descarta o body), renderizamos o editor
-  // com os valores do body + aviso de conflito.
   if (!forcar && versaoQueAbri > 0 && versaoQueAbri !== ficha.versao_atual) {
     return renderizarEditorComErros([], {
       versaoQueAbri,
@@ -700,9 +680,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     return res.redirect(`/unidades/${id}?salvo=0`);
   }
 
-  // F2 + F3: salvamento atômico + transação.
-  // O UPDATE só pega se versao_atual ainda for a que a usuária abriu
-  // (a menos que forcar=1). Se não pegar, foi conflito por baixo dos panos.
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -722,8 +699,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
 
     if (updateR.rows.length === 0) {
       await client.query("ROLLBACK");
-      // Alguém salvou no meio do caminho (conflito por baixo dos panos).
-      // Recarrega a versão atual do banco para mostrar o conflito.
       const frAtual = await pool.query(
         "SELECT versao_atual FROM fichas WHERE id = $1",
         [ficha.id]
@@ -1028,7 +1003,7 @@ app.get("/obras", async (req, res) => {
                      GROUP BY estado_revisao
                   ) sub2
               ) AS estados_revisao_contagem,
-                            EXISTS (
+              EXISTS (
                 SELECT 1
                   FROM usos u
                  WHERE u.obra_id = o.id
@@ -1164,6 +1139,10 @@ app.post("/obras/nova", async (req, res) => {
   if (erros.length > 0) {
     return res.status(400).render("obra-form", {
       titulo: "Nova Obra",
+      modo: "criar",
+      acao: "/obras/nova",
+      cancelarUrl: "/obras",
+      obraId: null,
       valores: {
         titulo, titulo_original: titulo_original || "", idioma_original: idioma_original || "",
         tipo_material, autores: autoresRaw, observacoes: observacoes || "", estado_verificacao,
@@ -1223,6 +1202,10 @@ app.post("/obras/nova", async (req, res) => {
     console.error("Erro ao criar obra:", err.message);
     return res.status(500).render("obra-form", {
       titulo: "Nova Obra",
+      modo: "criar",
+      acao: "/obras/nova",
+      cancelarUrl: "/obras",
+      obraId: null,
       valores: {
         titulo, titulo_original: titulo_original || "", idioma_original: idioma_original || "",
         tipo_material, autores: autoresRaw, observacoes: observacoes || "", estado_verificacao,
@@ -1416,7 +1399,6 @@ app.get("/obras/:id/decisoes/nova", async (req, res) => {
             a.titulo AS aula_titulo
        FROM usos u
        JOIN unidades a ON a.id = u.aula_id
-       LEFT JOIN edicoes e ON e.id = u.edicao_id
       WHERE u.obra_id = $1
       ORDER BY
         CASE u.papel
@@ -1622,15 +1604,21 @@ app.get("/obras/:id", async (req, res) => {
        JOIN unidades a ON a.id = u.aula_id
        LEFT JOIN edicoes e ON e.id = u.edicao_id
       WHERE u.obra_id = $1
-      ORDER BY a.titulo`,
+      ORDER BY
+        CASE u.papel
+          WHEN 'texto_base' THEN 1
+          WHEN 'texto_complementar' THEN 2
+          WHEN 'ficcao_ancora' THEN 3
+          WHEN 'ficcao_complementar' THEN 4
+          ELSE 5
+        END,
+        a.titulo`,
     [id]
   );
 
-    // M2: para cada uso, calcular o caminho curricular da aula
   const aulasIds = [...new Set(usosR.rows.map((u) => u.aula_id))];
   const caminhosPorAula = {};
   if (aulasIds.length > 0) {
-    // Busca a cadeia de cada aula de uma vez, usando uma única query com CTE
     const caminhosR = await pool.query(
       `WITH RECURSIVE arvore AS (
          SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel
@@ -1652,7 +1640,6 @@ app.get("/obras/:id", async (req, res) => {
     }
   }
 
-
   const usosIds = usosR.rows.map((u) => u.id);
   let recortesPorUso = {};
   if (usosIds.length > 0) {
@@ -1669,13 +1656,11 @@ app.get("/obras/:id", async (req, res) => {
     }
   }
 
-    // F6: contar aulas distintas em que a obra aparece
   const totalAulasDistintasR = await pool.query(
     "SELECT COUNT(DISTINCT aula_id)::int AS total FROM usos WHERE obra_id = $1",
     [id]
   );
   const totalAulasDistintas = totalAulasDistintasR.rows[0].total;
-
 
   const decisoesR = await pool.query(
     `SELECT d.id, d.estado, d.justificativa, d.criado_em
@@ -1748,7 +1733,7 @@ app.get("/obras/:id", async (req, res) => {
 
   const salvo = req.query.salvo === "1";
 
-    res.render("obra-detalhe", {
+  res.render("obra-detalhe", {
     titulo: obra.titulo,
     obra,
     autores: autoresR.rows,
@@ -1762,7 +1747,6 @@ app.get("/obras/:id", async (req, res) => {
 
 // ----- Rotas de edição de obra e edições (R4) -----
 
-// Rota: formulário de editar obra
 app.get("/obras/:id/editar", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -1807,7 +1791,6 @@ app.get("/obras/:id/editar", async (req, res) => {
   });
 });
 
-// Rota: salvar edição de obra
 app.post("/obras/:id/editar", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -1859,7 +1842,6 @@ app.post("/obras/:id/editar", async (req, res) => {
     });
   }
 
-  // Se ficou sem autor e estava verificada, marca incompleta
   let estadoFinal = estado_verificacao;
   if (autores.length === 0 && estadoFinal === "verificada") {
     estadoFinal = "incompleta";
@@ -1882,7 +1864,6 @@ app.post("/obras/:id/editar", async (req, res) => {
       [titulo, titulo_original, idioma_original, tipo_material, observacoes, estadoFinal, id]
     );
 
-    // D37: apagar e reinserir autores
     await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [id]);
     for (let i = 0; i < autores.length; i++) {
       await client.query(
@@ -1902,7 +1883,6 @@ app.post("/obras/:id/editar", async (req, res) => {
   }
 });
 
-// Rota: formulário de nova edição
 app.get("/obras/:id/edicoes/nova", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -1929,6 +1909,7 @@ app.get("/obras/:id/edicoes/nova", async (req, res) => {
       idioma: "",
       isbn: "",
       link_referencia: "",
+      capa_url: "",
       observacoes: "",
       estado_verificacao: "pendente"
     },
@@ -1937,7 +1918,6 @@ app.get("/obras/:id/edicoes/nova", async (req, res) => {
   });
 });
 
-// Rota: salvar nova edição
 app.post("/obras/:id/edicoes/nova", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -1957,6 +1937,7 @@ app.post("/obras/:id/edicoes/nova", async (req, res) => {
   const idioma = String(req.body.idioma || "").trim() || null;
   const isbn = String(req.body.isbn || "").trim() || null;
   const link_referencia = String(req.body.link_referencia || "").trim() || null;
+  const capa_url = String(req.body.capa_url || "").trim() || null;
   const observacoes = String(req.body.observacoes || "").trim() || null;
   const estado_verificacao = String(req.body.estado_verificacao || "pendente").trim();
 
@@ -1980,7 +1961,7 @@ app.post("/obras/:id/edicoes/nova", async (req, res) => {
       acao: `/obras/${id}/edicoes/nova`,
       cancelarUrl: `/obras/${id}`,
       obra,
-      valores: { editora: editora || "", ano: anoRaw, numero_edicao: numero_edicao || "", traducao: traducao || "", idioma: idioma || "", isbn: isbn || "", link_referencia: link_referencia || "", observacoes: observacoes || "", estado_verificacao },
+      valores: { editora: editora || "", ano: anoRaw, numero_edicao: numero_edicao || "", traducao: traducao || "", idioma: idioma || "", isbn: isbn || "", link_referencia: link_referencia || "", capa_url: capa_url || "", observacoes: observacoes || "", estado_verificacao },
       erros,
       estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
     });
@@ -1988,15 +1969,14 @@ app.post("/obras/:id/edicoes/nova", async (req, res) => {
 
   await pool.query(
     `INSERT INTO edicoes
-       (obra_id, editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, observacoes, estado_verificacao)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [id, editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, observacoes, estado_verificacao]
+       (obra_id, editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, capa_url, observacoes, estado_verificacao)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [id, editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, capa_url, observacoes, estado_verificacao]
   );
 
   res.redirect(`/obras/${id}?salvo=1`);
 });
 
-// Rota: formulário de editar edição
 app.get("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
   const id = Number(req.params.id);
   const edicaoId = Number(req.params.edicao_id);
@@ -2010,13 +1990,12 @@ app.get("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
   }
   const obra = or.rows[0];
 
-   const er = await pool.query(
+  const er = await pool.query(
     `SELECT id, editora, ano, numero_edicao, traducao, idioma, isbn,
             link_referencia, observacoes, estado_verificacao, capa_url
        FROM edicoes WHERE id = $1 AND obra_id = $2`,
     [edicaoId, id]
   );
-
   if (er.rows.length === 0) {
     return res.status(404).type("text/plain").send("Edição não encontrada.");
   }
@@ -2036,6 +2015,7 @@ app.get("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
       idioma: edicao.idioma || "",
       isbn: edicao.isbn || "",
       link_referencia: edicao.link_referencia || "",
+      capa_url: edicao.capa_url || "",
       observacoes: edicao.observacoes || "",
       estado_verificacao: edicao.estado_verificacao
     },
@@ -2044,7 +2024,6 @@ app.get("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
   });
 });
 
-// Rota: salvar edição de edição
 app.post("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
   const id = Number(req.params.id);
   const edicaoId = Number(req.params.edicao_id);
@@ -2070,6 +2049,7 @@ app.post("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
   const idioma = String(req.body.idioma || "").trim() || null;
   const isbn = String(req.body.isbn || "").trim() || null;
   const link_referencia = String(req.body.link_referencia || "").trim() || null;
+  const capa_url = String(req.body.capa_url || "").trim() || null;
   const observacoes = String(req.body.observacoes || "").trim() || null;
   const estado_verificacao = String(req.body.estado_verificacao || "pendente").trim();
 
@@ -2093,7 +2073,7 @@ app.post("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
       acao: `/obras/${id}/edicoes/${edicaoId}/editar`,
       cancelarUrl: `/obras/${id}`,
       obra,
-      valores: { editora: editora || "", ano: anoRaw, numero_edicao: numero_edicao || "", traducao: traducao || "", idioma: idioma || "", isbn: isbn || "", link_referencia: link_referencia || "", observacoes: observacoes || "", estado_verificacao },
+      valores: { editora: editora || "", ano: anoRaw, numero_edicao: numero_edicao || "", traducao: traducao || "", idioma: idioma || "", isbn: isbn || "", link_referencia: link_referencia || "", capa_url: capa_url || "", observacoes: observacoes || "", estado_verificacao },
       erros,
       estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
     });
@@ -2102,16 +2082,15 @@ app.post("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
   await pool.query(
     `UPDATE edicoes
         SET editora = $1, ano = $2, numero_edicao = $3, traducao = $4, idioma = $5,
-            isbn = $6, link_referencia = $7, observacoes = $8, estado_verificacao = $9,
-            atualizado_em = now()
-      WHERE id = $10`,
-    [editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, observacoes, estado_verificacao, edicaoId]
+            isbn = $6, link_referencia = $7, capa_url = $8, observacoes = $9,
+            estado_verificacao = $10, atualizado_em = now()
+      WHERE id = $11`,
+    [editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, capa_url, observacoes, estado_verificacao, edicaoId]
   );
 
   res.redirect(`/obras/${id}?salvo=1`);
 });
 
-// Rota: excluir edição (D35: bloqueia se em uso; D36: exclusão direta se não usada)
 app.post("/obras/:id/edicoes/:edicao_id/excluir", async (req, res) => {
   const id = Number(req.params.id);
   const edicaoId = Number(req.params.edicao_id);
@@ -2146,7 +2125,6 @@ app.post("/obras/:id/edicoes/:edicao_id/excluir", async (req, res) => {
 
 // ----- Rotas de edição de uso (R4) -----
 
-// Rota: formulário de editar uso
 app.get("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   const id = Number(req.params.id);
   const usoId = Number(req.params.uso_id);
@@ -2234,7 +2212,6 @@ app.get("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   });
 });
 
-// Rota: salvar edição de uso
 app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   const id = Number(req.params.id);
   const usoId = Number(req.params.uso_id);
@@ -2371,7 +2348,6 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
       [obra_id, edicao_id, papel, modalidade, orientacao, observacoes, estado_revisao, usoId]
     );
 
-    // D38: apagar e reinserir recortes
     await client.query("DELETE FROM usos_recortes WHERE uso_id = $1", [usoId]);
     for (let i = 0; i < recortes.length; i++) {
       const r = recortes[i];
@@ -2392,8 +2368,6 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
     client.release();
   }
 });
-
-// ----- Fim das rotas de bibliografia -----
 
 // ----- Rotas de uso (obra em aula) -----
 
@@ -2462,6 +2436,8 @@ app.get("/unidades/:id/usos/novo", async (req, res) => {
     },
     erros: [],
     modo: "criar",
+    acao: `/unidades/${id}/usos/novo`,
+    cancelarUrl: `/unidades/${id}`,
     papeis: Object.entries(ROTULO_PAPEL),
     modalidades: Object.entries(ROTULO_MODALIDADE),
     estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO),
@@ -2474,14 +2450,12 @@ app.get("/obras/:id/edicoes.json", async (req, res) => {
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).json({ erro: "Id inválido." });
   }
- 
   const r = await pool.query(
     `SELECT id, editora, ano, numero_edicao, idioma, capa_url
        FROM edicoes WHERE obra_id = $1
       ORDER BY ano NULLS LAST, id`,
     [id]
-  );  
-  
+  );
   res.json({ edicoes: r.rows });
 });
 
@@ -2511,8 +2485,6 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
   const observacoes = String(req.body.observacoes || "").trim() || null;
   const estado_revisao = String(req.body.estado_revisao || "").trim();
 
-  // CORREÇÃO: o Express com `extended: true` remove os colchetes
-  // dos nomes dos campos. Lemos sem colchetes.
   const rotulos = [].concat(req.body.recorte_rotulo || []);
   const tipos = [].concat(req.body.recorte_tipo || []);
   const inicios = [].concat(req.body.recorte_inicio || []);
@@ -2595,6 +2567,8 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
       },
       erros,
       modo: "criar",
+      acao: `/unidades/${id}/usos/novo`,
+      cancelarUrl: `/unidades/${id}`,
       papeis: Object.entries(ROTULO_PAPEL),
       modalidades: Object.entries(ROTULO_MODALIDADE),
       estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO),
@@ -2714,19 +2688,19 @@ app.get("/unidades/:id", async (req, res) => {
                 ''
               ) AS obra_autores,
               e.id AS edicao_id_ref, e.editora AS edicao_editora, e.ano AS edicao_ano
-                  FROM usos u
-                  JOIN obras o ON o.id = u.obra_id
-                  LEFT JOIN edicoes e ON e.id = u.edicao_id
-                WHERE u.aula_id = $1
-                ORDER BY
-                    CASE u.papel
-                     WHEN 'texto_base' THEN 1
-                      WHEN 'texto_complementar' THEN 2
-                      WHEN 'ficcao_ancora' THEN 3
-                      WHEN 'ficcao_complementar' THEN 4
-                         ELSE 5
-                    END,
-                     o.titulo`,
+         FROM usos u
+         JOIN obras o ON o.id = u.obra_id
+         LEFT JOIN edicoes e ON e.id = u.edicao_id
+        WHERE u.aula_id = $1
+        ORDER BY
+          CASE u.papel
+            WHEN 'texto_base' THEN 1
+            WHEN 'texto_complementar' THEN 2
+            WHEN 'ficcao_ancora' THEN 3
+            WHEN 'ficcao_complementar' THEN 4
+            ELSE 5
+          END,
+          o.titulo`,
       [id]
     );
 
@@ -2755,11 +2729,10 @@ app.get("/unidades/:id", async (req, res) => {
     }));
   }
 
-  // M2: caminho curricular da aula (usado em cada uso, para contexto)
   let caminhoCurricular = "";
   if (unidade.tipo === "aula") {
-    const cadeia = await cadeiaDeSuperiores(id);
-    caminhoCurricular = cadeia.map((u) => u.titulo).join(" › ");
+    const cadeiaDaAula = await cadeiaDeSuperiores(id);
+    caminhoCurricular = cadeiaDaAula.map((u) => u.titulo).join(" › ");
   }
 
   const salvo = req.query.salvo === "1";

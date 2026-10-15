@@ -8,7 +8,8 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
-<%- include('./partials/navbar') %>
+  <%- include('./partials/navbar') %>
+
   <p class="caminho">
     <a href="/">Início</a> › <a href="/obras">Bibliografia</a> ›
     <a href="/obras/<%= obra.id %>"><%= obra.titulo %></a> ›
@@ -51,6 +52,10 @@
     <label for="link_referencia">Link de referência <span class="ajuda">(Drive, editora, etc.)</span></label>
     <input type="text" id="link_referencia" name="link_referencia" value="<%= valores.link_referencia %>">
 
+    <label for="capa_url">URL da capa <span class="ajuda">(opcional; link direto para uma imagem)</span></label>
+    <input type="text" id="capa_url" name="capa_url" value="<%= valores.capa_url %>"
+           placeholder="https://...">
+
     <label for="observacoes">Observações</label>
     <textarea id="observacoes" name="observacoes"><%= valores.observacoes %></textarea>
 
@@ -69,9 +74,6 @@
     </div>
   </form>
 
-  <footer>
-    <a href="/health">/health</a>
-  </footer>
-<%- include('./partials/botoes-flutuantes') %>
+  <%- include('./partials/botoes-flutuantes') %>
 </body>
 </html>
