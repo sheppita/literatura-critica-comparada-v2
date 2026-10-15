@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
+    
+<%- include('./partials/navbar') %>    
   <p class="caminho">
     <a href="/">Início</a>
     <% for (const u of cadeia) { %>
@@ -212,5 +214,6 @@
       });
     })();
   </script>
+<%- include('./partials/botoes-flutuantes') %>
 </body>
 </html>

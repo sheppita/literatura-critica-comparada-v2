@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
+<%- include('./partials/navbar') %>
+
   <% if (typeof salvo !== 'undefined' && salvo) { %>
     <div class="aviso-sucesso">
       Ficha salva com sucesso.
@@ -179,5 +181,6 @@
   <footer>
     <a href="/health">/health</a>
   </footer>
+<%- include('./partials/botoes-flutuantes') %>
 </body>
 </html>

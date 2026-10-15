@@ -1,0 +1,54 @@
+<div class="botoes-flutuantes" id="botoes-flutuantes" aria-hidden="true">
+  <button type="button" class="btn-flutuante" id="btn-topo" title="Ir para o topo" aria-label="Ir para o topo">
+    ↑
+  </button>
+  <button type="button" class="btn-flutuante" id="btn-fundo" title="Ir para o final" aria-label="Ir para o final">
+    ↓
+  </button>
+</div>
+
+<script>
+  (function () {
+    const wrap = document.getElementById("botoes-flutuantes");
+    const btnTopo = document.getElementById("btn-topo");
+    const btnFundo = document.getElementById("btn-fundo");
+
+    // Só mostra em telas largas (>= 600px)
+    const ehTelaGrande = () => window.matchMedia("(min-width: 600px)").matches;
+
+    function atualizarVisibilidade() {
+      if (!ehTelaGrande()) {
+        wrap.style.display = "none";
+        return;
+      }
+      const rolagem = window.scrollY;
+      const alturaTotal = document.documentElement.scrollHeight;
+      const alturaJanela = window.innerHeight;
+      const temRolagem = alturaTotal > alturaJanela + 200;
+
+      if (!temRolagem) {
+        wrap.style.display = "none";
+        return;
+      }
+      wrap.style.display = "flex";
+
+      // Quando já está no topo, esconde o "ir pro topo"
+      btnTopo.style.display = rolagem > 100 ? "flex" : "none";
+
+      // Quando já está no fundo, esconde o "ir pro fundo"
+      const noFundo = rolagem + alturaJanela >= alturaTotal - 100;
+      btnFundo.style.display = noFundo ? "none" : "flex";
+    }
+
+    btnTopo.addEventListener("click", () => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    btnFundo.addEventListener("click", () => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+    });
+
+    window.addEventListener("scroll", atualizarVisibilidade, { passive: true });
+    window.addEventListener("resize", atualizarVisibilidade);
+    atualizarVisibilidade();
+  })();
+</script>

@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
+<%- include('./partials/navbar') %>
   <p class="caminho">
     <a href="/">Início</a> › <a href="/obras">Bibliografia</a> › <%= obra.titulo %>
   </p>
@@ -228,5 +229,6 @@
   <footer>
     <a href="/health">/health</a>
   </footer>
+<%- include('./partials/botoes-flutuantes') %>
 </body>
 </html>

@@ -1491,7 +1491,7 @@ app.get("/obras/:id", async (req, res) => {
 
   const edicoesR = await pool.query(
     `SELECT id, editora, ano, numero_edicao, traducao, idioma, isbn,
-            link_referencia, observacoes, estado_verificacao,
+            link_referencia, observacoes, estado_verificacao, capa_url,
             criado_em, atualizado_em
        FROM edicoes
       WHERE obra_id = $1
@@ -1868,12 +1868,13 @@ app.get("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
   }
   const obra = or.rows[0];
 
-  const er = await pool.query(
+   const er = await pool.query(
     `SELECT id, editora, ano, numero_edicao, traducao, idioma, isbn,
-            link_referencia, observacoes, estado_verificacao
+            link_referencia, observacoes, estado_verificacao, capa_url
        FROM edicoes WHERE id = $1 AND obra_id = $2`,
     [edicaoId, id]
   );
+
   if (er.rows.length === 0) {
     return res.status(404).type("text/plain").send("Edição não encontrada.");
   }
@@ -2331,12 +2332,14 @@ app.get("/obras/:id/edicoes.json", async (req, res) => {
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).json({ erro: "Id inválido." });
   }
+ 
   const r = await pool.query(
-    `SELECT id, editora, ano, numero_edicao, idioma
+    `SELECT id, editora, ano, numero_edicao, idioma, capa_url
        FROM edicoes WHERE obra_id = $1
       ORDER BY ano NULLS LAST, id`,
     [id]
-  );
+  );  
+  
   res.json({ edicoes: r.rows });
 });
 
