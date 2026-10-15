@@ -33,3 +33,11 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 - O banco do Neon se chama `neondb` dentro do projeto `literatura-critica-comparada-v2`.
 - O protótipo antigo permanece arquivado em repositório separado.
 - Restrição no banco: `descricao_apenas_em_eixo_disciplina_modulo` (adicionada em out/2026).
+
+| D17 | Tabelas `fichas` e `fichas_versoes` (1-para-1 com aula) | consolidada |
+| D18 | Toda aula tem ficha em branco desde a criação | consolidada |
+| D19 | Pré-visualização por **botão** (Markdown processado no servidor) | consolidada |
+| D20 | Ficha **integrada na página da aula** (não é tela separada) | consolidada |
+| D21 | Fase 2 dividida em 7 etapas (2.1 a 2.7) | consolidada |
+| D22 | Restauração cria nova versão no histórico (linha do tempo preservada) | consolidada |
+| D23 | Detecção de conflito impede salvamento silencioso em versão mais antiga | consolidada |
