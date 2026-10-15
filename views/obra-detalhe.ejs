@@ -96,11 +96,19 @@
             <div class="detalhe-suave">ISBN: <%= e.isbn %></div>
           <% } %>
           <% if (e.link_referencia) { %>
-            <div class="detalhe-suave">
-              <a href="<%= e.link_referencia %>" target="_blank" rel="noopener noreferrer">
-                <%= e.link_referencia %>
-              </a>
+          <% if (u.caminho) { %>
+            <div class="detalhe-suave caminho-uso">
+              <%= u.caminho %>
             </div>
+          <% } %>
+          <div class="detalhe-suave">
+            Papel: <%= u.rotuloPapel %> · Modalidade: <%= u.rotuloModalidade %> · Revisão: <%= u.rotuloEstadoRevisao %>
+            <% if (u.edicao_id) { %>
+              · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
+            <% } else { %>
+              · <em>Edição não informada</em>
+            <% } %>
+          </div>
           <% } %>
           <% if (e.observacoes) { %>
             <div class="detalhe-suave"><%= e.observacoes %></div>
@@ -155,7 +163,12 @@
                 return r.observacao ? `${base} — ${r.observacao}` : base;
               }).join(' · ') %>
             </div>
+          <% } else if (u.modalidade === 'parcial') { %>
+            <div class="detalhe-suave">
+              Recortes: <em>Recorte não informado</em>
+            </div>
           <% } %>
+          
           <% if (u.orientacao) { %>
             <div class="detalhe-suave"><em><%= u.orientacao %></em></div>
           <% } %>

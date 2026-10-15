@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <%- include('./partials/navbar') %>
+
+  <p class="caminho">
+    <a href="/">Início</a> › Nova Aula
+  </p>
+
+  <h1>Nova Aula</h1>
+  <p class="subtitulo">Escolha o tema ao qual a aula pertence</p>
+
+  <form method="GET" action="/aulas/nova" class="filtros-obras">
+    <input type="text" name="q" placeholder="Buscar por tema, módulo, disciplina ou eixo..."
+           value="<%= busca %>" autofocus>
+    <button type="submit">Buscar</button>
+    <% if (busca) { %>
+      <a href="/aulas/nova" class="botao-ghost">Limpar</a>
+    <% } %>
+  </form>
+
+  <% if (totalTemas === 0) { %>
+    <p class="aviso-vazio">
+      <% if (busca) { %>
+        Nenhum tema encontrado com "<%= busca %>".
+      <% } else { %>
+        Nenhum tema cadastrado ainda. Cadastre um tema antes de criar aulas.
+      <% } %>
+    </p>
+  <% } else { %>
+    <p class="contador-resultados">
+      <%= totalTemas %> tema<%= totalTemas === 1 ? '' : 's' %>
+      <% if (busca) { %> encontrado<%= totalTemas === 1 ? '' : 's' %><% } %>.
+    </p>
+
+    <% for (const eixo of estrutura) { %>
+      <div class="bloco-eixo">
+        <h2><%= eixo.titulo %></h2>
+
+        <% for (const disc of eixo.disciplinas) { %>
+          <div class="bloco-disciplina">
+            <h3><%= disc.titulo %></h3>
+
+            <% for (const mod of disc.modulos) { %>
+              <div class="bloco-modulo">
+                <p class="rotulo-modulo"><%= mod.titulo %></p>
+                <ul class="lista-temas">
+                  <% for (const t of mod.temas) { %>
+                    <li>
+                      <% if (t.codigo) { %><strong><%= t.codigo %></strong> — <% } %>
+                      <a href="/unidades/nova?tipo=aula&superior_id=<%= t.id %>">
+                        <%= t.titulo %>
+                      </a>
+                      <span class="link-acao">→ nova aula</span>
+                    </li>
+                  <% } %>
+                </ul>
+              </div>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+    <% } %>
+  <% } %>
+
+  <p style="margin-top: 2rem;">
+    <a href="/" class="botao-ghost">Voltar ao Início</a>
+  </p>
+
+  <%- include('./partials/botoes-flutuantes') %>
+</body>
+</html>

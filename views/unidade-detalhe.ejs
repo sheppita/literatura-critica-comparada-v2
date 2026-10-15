@@ -31,7 +31,10 @@
 
   <h1><%= unidade.titulo %></h1>
   <p class="subtitulo">
-    <%= rotuloTipo %><% if (unidade.codigo) { %> · <%= unidade.codigo %><% } %>
+    <% if (typeof rotuloTipoExibido !== 'undefined' && rotuloTipoExibido) { %>
+      <%= rotuloTipoExibido %><% if (unidade.codigo) { %> · <% } %>
+    <% } %>
+    <% if (unidade.codigo) { %><%= unidade.codigo %><% } %>
   </p>
 
   <% if (unidade.descricao) { %>
@@ -111,10 +114,12 @@
               </span>
                       
             </div>
-            <div class="detalhe-suave">
+             <div class="detalhe-suave">
               <%= u.rotuloPapel %> · <%= u.rotuloModalidade %> · <%= u.rotuloEstadoRevisao %>
               <% if (u.edicao_id) { %>
                 · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
+              <% } else { %>
+                · <em>Edição não informada</em>
               <% } %>
             </div>
             <% if (u.recortes.length > 0) { %>
@@ -129,6 +134,10 @@
                   const base = (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
                   return r.observacao ? `${base} — ${r.observacao}` : base;
                 }).join(' · ') %>
+              </div>
+            <% } else if (u.modalidade === 'parcial') { %>
+              <div class="detalhe-suave">
+                Recortes: <em>Recorte não informado</em>
               </div>
             <% } %>
             <% if (u.orientacao) { %>

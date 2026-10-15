@@ -129,6 +129,23 @@ async function cadeiaDeSuperiores(id) {
   return cadeia;
 }
 
+async function caminhoCurricularDaAula(aulaId) {
+  const cadeia = await cadeiaDeSuperiores(aulaId);
+  return cadeia.map((u) => u.titulo).join(" › ");
+}
+
+
+function rotuloTipoOuOmissao(tipo, codigo) {
+  const rotulo = ROTULO_TIPO[tipo] || tipo;
+  if (!codigo) return rotulo;
+  const codigoUpper = String(codigo).toUpperCase();
+  const rotuloUpper = String(rotulo).toUpperCase();
+  if (codigoUpper.startsWith(rotuloUpper)) {
+    return null; // omite o tipo
+  }
+  return rotulo;
+}
+
 app.get("/", async (req, res) => {
   try {
     const r = await pool.query(
@@ -288,6 +305,10 @@ app.get("/unidades/:id/editar", async (req, res) => {
     );
     if (s.rows.length > 0) superior = s.rows[0];
   }
+
+    // #14: rótulo do tipo, omitido quando o código começa com ele
+  const rotuloTipoExibido = rotuloTipoOuOmissao(unidade.tipo, unidade.codigo);
+
 
   res.render("unidade-form", {
     titulo: `Editar ${ROTULO_TIPO[u.tipo]}`,
@@ -455,6 +476,90 @@ app.post("/unidades/:id/excluir", async (req, res) => {
     res.redirect("/");
   }
 });
+
+// ----- Rota: tela intermediária para nova aula -----
+
+app.get("/aulas/nova", async (req, res) => {
+  const busca = String(req.query.q || "").trim();
+
+  // Busca todos os temas, com sua cadeia de superiores
+  const temasR = await pool.query(
+    `SELECT
+        t.id AS tema_id, t.titulo AS tema_titulo, t.codigo AS tema_codigo,
+        m.id AS modulo_id, m.titulo AS modulo_titulo,
+        d.id AS disciplina_id, d.titulo AS disciplina_titulo,
+        e.id AS eixo_id, e.titulo AS eixo_titulo
+       FROM unidades t
+       JOIN unidades m ON m.id = t.superior_id AND m.tipo = 'modulo'
+       JOIN unidades d ON d.id = m.superior_id AND d.tipo = 'disciplina'
+       JOIN unidades e ON e.id = d.superior_id AND e.tipo = 'eixo'
+      WHERE t.tipo = 'tema'
+      ORDER BY e.ordem, e.titulo, d.ordem, d.titulo, m.ordem, m.titulo, t.ordem, t.titulo`
+  );
+
+  // Filtro por busca (em memória — a lista de temas não é gigante)
+  let temas = temasR.rows;
+  if (busca) {
+    const b = busca.toLowerCase();
+    temas = temas.filter((t) =>
+      t.tema_titulo.toLowerCase().includes(b) ||
+      (t.tema_codigo && t.tema_codigo.toLowerCase().includes(b)) ||
+      t.modulo_titulo.toLowerCase().includes(b) ||
+      t.disciplina_titulo.toLowerCase().includes(b) ||
+      t.eixo_titulo.toLowerCase().includes(b)
+    );
+  }
+
+  // Agrupa por eixo → disciplina → módulo → [temas]
+  const porEixo = new Map();
+  for (const t of temas) {
+    if (!porEixo.has(t.eixo_id)) {
+      porEixo.set(t.eixo_id, {
+        id: t.eixo_id,
+        titulo: t.eixo_titulo,
+        disciplinas: new Map()
+      });
+    }
+    const eixo = porEixo.get(t.eixo_id);
+    if (!eixo.disciplinas.has(t.disciplina_id)) {
+      eixo.disciplinas.set(t.disciplina_id, {
+        id: t.disciplina_id,
+        titulo: t.disciplina_titulo,
+        modulos: new Map()
+      });
+    }
+    const disc = eixo.disciplinas.get(t.disciplina_id);
+    if (!disc.modulos.has(t.modulo_id)) {
+      disc.modulos.set(t.modulo_id, {
+        id: t.modulo_id,
+        titulo: t.modulo_titulo,
+        temas: []
+      });
+    }
+    disc.modulos.get(t.modulo_id).temas.push({
+      id: t.tema_id,
+      titulo: t.tema_titulo,
+      codigo: t.tema_codigo
+    });
+  }
+
+  // Converte Maps para arrays (mais fácil de iterar no template)
+  const estrutura = Array.from(porEixo.values()).map((e) => ({
+    ...e,
+    disciplinas: Array.from(e.disciplinas.values()).map((d) => ({
+      ...d,
+      modulos: Array.from(d.modulos.values())
+    }))
+  }));
+
+  res.render("aula-nova-escolher-tema", {
+    titulo: "Nova Aula — Escolher Tema",
+    busca,
+    estrutura,
+    totalTemas: temas.length
+  });
+});
+
 
 // ----- Rotas de ficha -----
 
@@ -1311,8 +1416,17 @@ app.get("/obras/:id/decisoes/nova", async (req, res) => {
             a.titulo AS aula_titulo
        FROM usos u
        JOIN unidades a ON a.id = u.aula_id
+       LEFT JOIN edicoes e ON e.id = u.edicao_id
       WHERE u.obra_id = $1
-      ORDER BY a.titulo`,
+      ORDER BY
+        CASE u.papel
+          WHEN 'texto_base' THEN 1
+          WHEN 'texto_complementar' THEN 2
+          WHEN 'ficcao_ancora' THEN 3
+          WHEN 'ficcao_complementar' THEN 4
+          ELSE 5
+        END,
+        a.titulo`,
     [id]
   );
 
@@ -1512,6 +1626,33 @@ app.get("/obras/:id", async (req, res) => {
     [id]
   );
 
+    // M2: para cada uso, calcular o caminho curricular da aula
+  const aulasIds = [...new Set(usosR.rows.map((u) => u.aula_id))];
+  const caminhosPorAula = {};
+  if (aulasIds.length > 0) {
+    // Busca a cadeia de cada aula de uma vez, usando uma única query com CTE
+    const caminhosR = await pool.query(
+      `WITH RECURSIVE arvore AS (
+         SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel
+           FROM unidades
+          WHERE id = ANY($1::bigint[])
+         UNION ALL
+         SELECT a.raiz_id, u.id, u.titulo, u.superior_id, a.nivel + 1
+           FROM unidades u
+           JOIN arvore a ON u.id = a.superior_id
+       )
+       SELECT raiz_id,
+              STRING_AGG(titulo, ' › ' ORDER BY nivel DESC) AS caminho
+         FROM arvore
+        GROUP BY raiz_id`,
+      [aulasIds]
+    );
+    for (const row of caminhosR.rows) {
+      caminhosPorAula[row.raiz_id] = row.caminho;
+    }
+  }
+
+
   const usosIds = usosR.rows.map((u) => u.id);
   let recortesPorUso = {};
   if (usosIds.length > 0) {
@@ -1601,7 +1742,8 @@ app.get("/obras/:id", async (req, res) => {
     recortes: recortesPorUso[u.id] || [],
     rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
     rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
-    rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao
+    rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao,
+    caminho: caminhosPorAula[u.aula_id] || ""
   }));
 
   const salvo = req.query.salvo === "1";
@@ -2572,11 +2714,19 @@ app.get("/unidades/:id", async (req, res) => {
                 ''
               ) AS obra_autores,
               e.id AS edicao_id_ref, e.editora AS edicao_editora, e.ano AS edicao_ano
-         FROM usos u
-         JOIN obras o ON o.id = u.obra_id
-         LEFT JOIN edicoes e ON e.id = u.edicao_id
-        WHERE u.aula_id = $1
-        ORDER BY o.titulo`,
+                  FROM usos u
+                  JOIN obras o ON o.id = u.obra_id
+                  LEFT JOIN edicoes e ON e.id = u.edicao_id
+                WHERE u.aula_id = $1
+                ORDER BY
+                    CASE u.papel
+                     WHEN 'texto_base' THEN 1
+                      WHEN 'texto_complementar' THEN 2
+                      WHEN 'ficcao_ancora' THEN 3
+                      WHEN 'ficcao_complementar' THEN 4
+                         ELSE 5
+                    END,
+                     o.titulo`,
       [id]
     );
 
@@ -2605,6 +2755,13 @@ app.get("/unidades/:id", async (req, res) => {
     }));
   }
 
+  // M2: caminho curricular da aula (usado em cada uso, para contexto)
+  let caminhoCurricular = "";
+  if (unidade.tipo === "aula") {
+    const cadeia = await cadeiaDeSuperiores(id);
+    caminhoCurricular = cadeia.map((u) => u.titulo).join(" › ");
+  }
+
   const salvo = req.query.salvo === "1";
   const nadaMudou = req.query.salvo === "0";
 
@@ -2614,12 +2771,14 @@ app.get("/unidades/:id", async (req, res) => {
     filhos: filhosR.rows,
     cadeia,
     rotuloTipo: ROTULO_TIPO[unidade.tipo],
+    rotuloTipoExibido: rotuloTipoOuOmissao(unidade.tipo, unidade.codigo),
     proximoNivel: proximo,
     rotuloProximo: proximo ? ROTULO_TIPO[proximo] : null,
     rotuloNovoProximo: proximo ? ROTULO_NOVO[proximo] : null,
     nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo],
     ficha,
     usosAula,
+    caminhoCurricular,
     salvo,
     nadaMudou
   });

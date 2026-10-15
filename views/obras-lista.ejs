@@ -16,7 +16,7 @@
   <h1>Bibliografia</h1>
   <p class="subtitulo">Catálogo de obras</p>
 
-  <form method="GET" action="/obras" class="filtros-obras">
+    <form method="GET" action="/obras" class="filtros-obras">
     <input type="text" name="q" placeholder="Buscar por título ou autoria..."
            value="<%= filtros.q %>">
 
@@ -42,6 +42,8 @@
     <% if (temFiltro) { %>
       <a href="/obras" class="botao-ghost">Limpar</a>
     <% } %>
+
+    <a href="/obras/nova" class="botao-ghost botao-nova-obra">+ Nova Obra</a>
   </form>
 
   <% if (obras.length === 0) { %>
@@ -111,11 +113,6 @@
       </tbody>
     </table>
   <% } %>
-
-  <p style="margin-top: 2rem;">
-    <a href="/obras/nova" class="botao-ghost">+ Nova Obra</a>
-  </p>
-
   <footer>
     <a href="/health">/health</a>
   </footer>
