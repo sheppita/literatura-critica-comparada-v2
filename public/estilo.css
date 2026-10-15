@@ -618,3 +618,49 @@ h2 {
   cursor: help;
   font-weight: 700;
 }
+
+/* Decisões de revisão */
+.lista-decisoes {
+  list-style: none;
+  padding-left: 0;
+}
+.decisao-item {
+  background: var(--creme-escuro);
+  border-left: 4px solid var(--verde-musgo);
+  border-radius: 0 6px 6px 0;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.7rem;
+}
+.decisao-item.decisao-vencida {
+  border-left-color: var(--terracota);
+  background: #fbe6de;
+}
+.decisao-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.decisao-justificativa {
+  margin: 0.5rem 0;
+  white-space: pre-wrap;
+}
+.aviso-vencida {
+  background: #fdecea;
+  border-left: 4px solid #c0392b;
+  padding: 0.5rem 0.75rem;
+  color: #7b1e1e;
+  font-size: 0.9rem;
+  border-radius: 0 6px 6px 0;
+  margin: 0.5rem 0;
+}
+
+/* Lista de checkboxes */
+.lista-checkbox {
+  list-style: none;
+  padding-left: 0;
+}
+.lista-checkbox li {
+  margin-bottom: 0.4rem;
+}

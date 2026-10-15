@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a> › <a href="/obras">Bibliografia</a> ›
+    <a href="/obras/<%= obra.id %>"><%= obra.titulo %></a> › Nova Decisão
+  </p>
+
+  <h1>Nova Decisão de Revisão</h1>
+  <p class="subtitulo">Obra: <%= obra.titulo %></p>
+
+  <% if (erros && erros.length > 0) { %>
+    <div class="erros">
+      <strong>Não foi possível salvar:</strong>
+      <ul>
+        <% for (const e of erros) { %>
+          <li><%= e %></li>
+        <% } %>
+      </ul>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/obras/<%= obra.id %>/decisoes/nova">
+    <fieldset class="bloco-recortes">
+      <legend>Usos cobertos por esta decisão</legend>
+
+      <% if (usos.length === 0) { %>
+        <p class="detalhe-suave">Esta obra ainda não tem usos em aulas.</p>
+      <% } else { %>
+        <ul class="lista-checkbox">
+          <% for (const u of usos) { %>
+            <li>
+              <label class="checkbox-linha">
+                <input type="checkbox" name="usos[]" value="<%= u.id %>"
+                       <%= valores.usosSelecionados.includes(u.id) ? 'checked' : '' %>>
+                <%= u.aula_titulo %>
+                <span class="detalhe-suave">
+                  · <%= u.rotuloPapel %> · <%= u.rotuloModalidade %>
+                  · Estado atual: <%= u.rotuloEstadoRevisao %>
+                </span>
+              </label>
+            </li>
+          <% } %>
+        </ul>
+      <% } %>
+    </fieldset>
+
+    <label for="estado">Estado da decisão</label>
+    <select id="estado" name="estado">
+      <% for (const [valor, rotulo] of estadosRevisao) { %>
+        <option value="<%= valor %>" <%= valores.estado === valor ? 'selected' : '' %>><%= rotulo %></option>
+      <% } %>
+    </select>
+
+    <label for="justificativa">
+      Justificativa <span class="ajuda">(obrigatória)</span>
+    </label>
+    <textarea id="justificativa" name="justificativa" rows="5"><%= valores.justificativa %></textarea>
+
+    <div class="acoes">
+      <button type="submit">Registrar Decisão</button>
+      <a class="botao-ghost" href="/obras/<%= obra.id %>">Cancelar</a>
+    </div>
+  </form>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+</body>
+</html>

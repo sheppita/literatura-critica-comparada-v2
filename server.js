@@ -829,7 +829,10 @@ app.get("/obras", async (req, res) => {
       condicoes.push(`o.estado_verificacao = $${params.length}`);
     }
 
-    const where = condicoes.length > 0 ? `WHERE ${condicoes.join(" AND ")}` : "";
+    // Sempre esconder arquivadas
+    condicoes.push(`o.arquivada = false`);
+
+    const where = `WHERE ${condicoes.join(" AND ")}`;
 
     const r = await pool.query(
       `SELECT o.id, o.titulo, o.tipo_material, o.estado_verificacao,
@@ -1063,6 +1066,351 @@ app.post("/obras/nova", async (req, res) => {
   }
 });
 
+// Rota: tela de mesclagem
+app.get("/obras/mesclar", async (req, res) => {
+  const or = await pool.query(
+    `SELECT o.id, o.titulo,
+            COALESCE(
+              (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                 FROM obras_autores oa WHERE oa.obra_id = o.id),
+              ''
+            ) AS autores
+       FROM obras o
+      WHERE o.arquivada = false
+      ORDER BY o.titulo`
+  );
+
+  res.render("obras-mesclar", {
+    titulo: "Mesclar Obras Duplicadas",
+    obras: or.rows,
+    valores: {
+      vencedora_id: "",
+      perdedora_id: "",
+      confirmacao: ""
+    },
+    erros: []
+  });
+});
+
+// Rota: processar mesclagem
+app.post("/obras/mesclar", async (req, res) => {
+  const vencedoraId = Number(req.body.vencedora_id) || null;
+  const perdedoraId = Number(req.body.perdedora_id) || null;
+  const confirmacao = String(req.body.confirmacao || "").trim();
+
+  const erros = [];
+
+  if (!vencedoraId || !perdedoraId) {
+    erros.push("Escolha as duas obras.");
+  }
+  if (vencedoraId && perdedoraId && vencedoraId === perdedoraId) {
+    erros.push("A obra vencedora e a perdedora não podem ser a mesma.");
+  }
+
+  let vencedora = null;
+  let perdedora = null;
+
+  if (vencedoraId) {
+    const r = await pool.query(
+      "SELECT id, titulo, arquivada FROM obras WHERE id = $1",
+      [vencedoraId]
+    );
+    if (r.rows.length === 0) {
+      erros.push("Obra vencedora não encontrada.");
+    } else if (r.rows[0].arquivada) {
+      erros.push("A obra vencedora está arquivada.");
+    } else {
+      vencedora = r.rows[0];
+    }
+  }
+
+  if (perdedoraId) {
+    const r = await pool.query(
+      "SELECT id, titulo, arquivada FROM obras WHERE id = $1",
+      [perdedoraId]
+    );
+    if (r.rows.length === 0) {
+      erros.push("Obra perdedora não encontrada.");
+    } else if (r.rows[0].arquivada) {
+      erros.push("A obra perdedora já está arquivada.");
+    } else {
+      perdedora = r.rows[0];
+    }
+  }
+
+  if (perdedora && confirmacao !== perdedora.titulo) {
+    erros.push(`Digite exatamente o título da obra perdedora ("${perdedora.titulo}") para confirmar.`);
+  }
+
+  if (erros.length > 0) {
+    const or = await pool.query(
+      `SELECT o.id, o.titulo,
+              COALESCE(
+                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                   FROM obras_autores oa WHERE oa.obra_id = o.id),
+                ''
+              ) AS autores
+         FROM obras o
+        WHERE o.arquivada = false
+        ORDER BY o.titulo`
+    );
+    return res.status(400).render("obras-mesclar", {
+      titulo: "Mesclar Obras Duplicadas",
+      obras: or.rows,
+      valores: {
+        vencedora_id: vencedoraId ? String(vencedoraId) : "",
+        perdedora_id: perdedoraId ? String(perdedoraId) : "",
+        confirmacao
+      },
+      erros
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // 1) Migrar edições
+    await client.query(
+      "UPDATE edicoes SET obra_id = $1 WHERE obra_id = $2",
+      [vencedoraId, perdedoraId]
+    );
+
+    // 2) Migrar usos
+    await client.query(
+      "UPDATE usos SET obra_id = $1, atualizado_em = now() WHERE obra_id = $2",
+      [vencedoraId, perdedoraId]
+    );
+
+    // 3) Migrar autores, sem duplicar
+    const autoresPerdedora = await client.query(
+      "SELECT nome, ordem FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
+      [perdedoraId]
+    );
+
+    // Pega a maior ordem atual na vencedora
+    const maxOrdemR = await client.query(
+      "SELECT COALESCE(MAX(ordem), 0) AS max_ordem FROM obras_autores WHERE obra_id = $1",
+      [vencedoraId]
+    );
+    let proximaOrdem = maxOrdemR.rows[0].max_ordem + 1;
+
+    for (const a of autoresPerdedora.rows) {
+      const existe = await client.query(
+        "SELECT 1 FROM obras_autores WHERE obra_id = $1 AND LOWER(nome) = LOWER($2)",
+        [vencedoraId, a.nome]
+      );
+      if (existe.rows.length === 0) {
+        await client.query(
+          "INSERT INTO obras_autores (obra_id, nome, ordem) VALUES ($1, $2, $3)",
+          [vencedoraId, a.nome, proximaOrdem]
+        );
+        proximaOrdem++;
+      }
+    }
+
+    // 4) Arquivar perdedora
+    await client.query(
+      "UPDATE obras SET arquivada = true, atualizado_em = now() WHERE id = $1",
+      [perdedoraId]
+    );
+
+    // 5) Limpar autores órfãos da perdedora
+    await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [perdedoraId]);
+
+    await client.query("COMMIT");
+    res.redirect(`/obras/${vencedoraId}`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao mesclar obras:", err.message);
+    res.status(500).type("text/plain").send("Erro interno ao mesclar. Nada foi alterado.");
+  } finally {
+    client.release();
+  }
+});
+
+// Rota: formulário de nova decisão de revisão
+app.get("/obras/:id/decisoes/nova", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const or = await pool.query(
+    "SELECT id, titulo FROM obras WHERE id = $1",
+    [id]
+  );
+  if (or.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Obra não encontrada.");
+  }
+  const obra = or.rows[0];
+
+  const usosR = await pool.query(
+    `SELECT u.id, u.papel, u.modalidade, u.estado_revisao,
+            a.titulo AS aula_titulo
+       FROM usos u
+       JOIN unidades a ON a.id = u.aula_id
+      WHERE u.obra_id = $1
+      ORDER BY a.titulo`,
+    [id]
+  );
+
+  const usos = usosR.rows.map((u) => ({
+    ...u,
+    rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
+    rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
+    rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao
+  }));
+
+  // Pré-selecionar usos que vieram pela querystring (?usos=1,2,3)
+  let usosPreSelecionados = [];
+  if (req.query.usos) {
+    usosPreSelecionados = String(req.query.usos)
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isInteger(n) && n > 0);
+  }
+
+  res.render("decisao-form", {
+    titulo: `Nova Decisão — ${obra.titulo}`,
+    obra,
+    usos,
+    valores: {
+      estado: "repeticao_validada",
+      justificativa: "",
+      usosSelecionados: usosPreSelecionados
+    },
+    erros: [],
+    estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO)
+  });
+});
+
+// Rota: processar criação de decisão
+app.post("/obras/:id/decisoes/nova", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const or = await pool.query(
+    "SELECT id, titulo FROM obras WHERE id = $1",
+    [id]
+  );
+  if (or.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Obra não encontrada.");
+  }
+  const obra = or.rows[0];
+
+  const estado = String(req.body.estado || "").trim();
+  const justificativa = String(req.body.justificativa || "").trim();
+  const usosSelecionados = [].concat(req.body["usos[]"] || [])
+    .map((s) => Number(s))
+    .filter((n) => Number.isInteger(n) && n > 0);
+
+  const erros = [];
+  if (!ROTULO_ESTADO_REVISAO[estado]) erros.push("Estado de revisão inválido.");
+  if (!justificativa) erros.push("A justificativa é obrigatória.");
+  if (usosSelecionados.length === 0) erros.push("Selecione pelo menos um uso.");
+
+  // Valida que todos os usos pertencem a esta obra
+  if (usosSelecionados.length > 0) {
+    const vr = await pool.query(
+      "SELECT id FROM usos WHERE id = ANY($1::bigint[]) AND obra_id = $2",
+      [usosSelecionados, id]
+    );
+    if (vr.rows.length !== usosSelecionados.length) {
+      erros.push("Um ou mais usos selecionados não pertencem a esta obra.");
+    }
+  }
+
+  const usosR = await pool.query(
+    `SELECT u.id, u.papel, u.modalidade, u.estado_revisao,
+            a.titulo AS aula_titulo
+       FROM usos u
+       JOIN unidades a ON a.id = u.aula_id
+      WHERE u.obra_id = $1
+      ORDER BY a.titulo`,
+    [id]
+  );
+
+  const usos = usosR.rows.map((u) => ({
+    ...u,
+    rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
+    rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
+    rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao
+  }));
+
+  if (erros.length > 0) {
+    return res.status(400).render("decisao-form", {
+      titulo: `Nova Decisão — ${obra.titulo}`,
+      obra,
+      usos,
+      valores: {
+        estado,
+        justificativa,
+        usosSelecionados
+      },
+      erros,
+      estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO)
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const dR = await client.query(
+      `INSERT INTO decisoes_revisao (obra_id, estado, justificativa)
+       VALUES ($1, $2, $3)
+       RETURNING id`,
+      [id, estado, justificativa]
+    );
+    const decisaoId = dR.rows[0].id;
+
+    for (const usoId of usosSelecionados) {
+      await client.query(
+        "INSERT INTO decisoes_usos (decisao_id, uso_id) VALUES ($1, $2)",
+        [decisaoId, usoId]
+      );
+      // Também atualiza o estado de revisão dos usos envolvidos
+      await client.query(
+        "UPDATE usos SET estado_revisao = $1, atualizado_em = now() WHERE id = $2",
+        [estado, usoId]
+      );
+    }
+
+    await client.query("COMMIT");
+    res.redirect(`/obras/${id}?salvo=1`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao criar decisão:", err.message);
+    res.status(500).type("text/plain").send("Erro interno ao salvar. Nada foi gravado.");
+  } finally {
+    client.release();
+  }
+});
+
+// Rota: excluir decisão
+app.post("/obras/:id/decisoes/:decisao_id/excluir", async (req, res) => {
+  const id = Number(req.params.id);
+  const decisaoId = Number(req.params.decisao_id);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(decisaoId) || decisaoId <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id FROM decisoes_revisao WHERE id = $1 AND obra_id = $2",
+    [decisaoId, id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Decisão não encontrada.");
+  }
+
+  await pool.query("DELETE FROM decisoes_revisao WHERE id = $1", [decisaoId]);
+
+  res.redirect(`/obras/${id}?salvo=1`);
+});
+
 app.get("/obras/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -1071,7 +1419,7 @@ app.get("/obras/:id", async (req, res) => {
 
   const or = await pool.query(
     `SELECT id, titulo, titulo_original, idioma_original, tipo_material,
-            observacoes, estado_verificacao, criado_em, atualizado_em
+            observacoes, estado_verificacao, arquivada, criado_em, atualizado_em
        FROM obras WHERE id = $1`,
     [id]
   );
@@ -1124,6 +1472,59 @@ app.get("/obras/:id", async (req, res) => {
     }
   }
 
+  // Buscar decisões de revisão
+  const decisoesR = await pool.query(
+    `SELECT d.id, d.estado, d.justificativa, d.criado_em
+       FROM decisoes_revisao d
+      WHERE d.obra_id = $1
+      ORDER BY d.criado_em DESC`,
+    [id]
+  );
+
+  // Buscar os usos ligados a cada decisão
+  const decisoesIds = decisoesR.rows.map((d) => d.id);
+  let usosPorDecisao = {};
+  let usoInfoPorId = {};
+  for (const u of usosR.rows) {
+    usoInfoPorId[u.id] = u;
+  }
+  if (decisoesIds.length > 0) {
+    const dr = await pool.query(
+      `SELECT du.decisao_id, du.uso_id
+         FROM decisoes_usos du
+        WHERE du.decisao_id = ANY($1::bigint[])`,
+      [decisoesIds]
+    );
+    for (const r of dr.rows) {
+      if (!usosPorDecisao[r.decisao_id]) usosPorDecisao[r.decisao_id] = [];
+      usosPorDecisao[r.decisao_id].push(r.uso_id);
+    }
+  }
+
+  const decisoes = decisoesR.rows.map((d) => {
+    const usosIdsDec = usosPorDecisao[d.id] || [];
+    const usosDaDecisao = usosIdsDec
+      .map((uid) => usoInfoPorId[uid])
+      .filter(Boolean);
+
+    // A decisão está "possivelmente vencida" se algum uso foi alterado depois dela
+    const dataDecisao = new Date(d.criado_em);
+    const vencida = usosDaDecisao.some(
+      (u) => new Date(u.atualizado_em) > dataDecisao
+    );
+
+    return {
+      ...d,
+      rotuloEstado: ROTULO_ESTADO_REVISAO[d.estado] || d.estado,
+      usos: usosDaDecisao.map((u) => ({
+        id: u.id,
+        aula_titulo: u.aula_titulo,
+        rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel
+      })),
+      vencida
+    };
+  });
+
   obra.rotuloTipoMaterial = ROTULO_TIPO_MATERIAL[obra.tipo_material] || obra.tipo_material;
   obra.rotuloEstadoVerificacao =
     ROTULO_ESTADO_VERIFICACAO[obra.estado_verificacao] || obra.estado_verificacao;
@@ -1142,12 +1543,16 @@ app.get("/obras/:id", async (req, res) => {
     rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao
   }));
 
+  const salvo = req.query.salvo === "1";
+
   res.render("obra-detalhe", {
     titulo: obra.titulo,
     obra,
     autores: autoresR.rows,
     edicoes,
-    usos
+    usos,
+    decisoes,
+    salvo
   });
 });
 
@@ -1181,6 +1586,7 @@ app.get("/unidades/:id/usos/novo", async (req, res) => {
               ''
             ) AS autores
        FROM obras o
+      WHERE o.arquivada = false
       ORDER BY o.titulo`
   );
 
@@ -1279,8 +1685,9 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
   if (!ROTULO_ESTADO_REVISAO[estado_revisao]) erros.push("Estado de revisão inválido.");
 
   if (obra_id) {
-    const o = await pool.query("SELECT id FROM obras WHERE id = $1", [obra_id]);
+    const o = await pool.query("SELECT id, arquivada FROM obras WHERE id = $1", [obra_id]);
     if (o.rows.length === 0) erros.push("Obra não encontrada.");
+    else if (o.rows[0].arquivada) erros.push("Esta obra está arquivada e não pode receber novos usos.");
   }
 
   if (edicao_id) {
@@ -1315,6 +1722,7 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
                 ''
               ) AS autores
          FROM obras o
+        WHERE o.arquivada = false
         ORDER BY o.titulo`
     );
     let edicoes = [];

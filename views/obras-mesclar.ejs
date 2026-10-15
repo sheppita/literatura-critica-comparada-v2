@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a> › <a href="/obras">Bibliografia</a> › Mesclar
+  </p>
+
+  <h1>Mesclar Obras Duplicadas</h1>
+  <p class="subtitulo">
+    Se você cadastrou a mesma obra duas vezes, pode fundir os registros aqui.
+  </p>
+
+  <div class="aviso-neutro">
+    <strong>Como funciona:</strong> a obra <em>vencedora</em> permanece.
+    A obra <em>perdedora</em> é <strong>arquivada</strong> (some do catálogo, mas
+    não é apagada do banco). As edições, autores e usos da perdedora migram
+    para a vencedora. Se a perdedora tiver um autor que a vencedora já tem, ele
+    não é duplicado. A operação é tudo-ou-nada.
+  </div>
+
+  <% if (erros && erros.length > 0) { %>
+    <div class="erros">
+      <strong>Não foi possível mesclar:</strong>
+      <ul>
+        <% for (const e of erros) { %>
+          <li><%= e %></li>
+        <% } %>
+      </ul>
+    </div>
+  <% } %>
+
+  <% if (obras.length < 2) { %>
+    <p class="aviso-vazio">
+      É preciso ter pelo menos duas obras cadastradas para mesclar.
+    </p>
+  <% } else { %>
+    <form method="POST" action="/obras/mesclar">
+      <label for="vencedora_id">Obra Vencedora (permanece)</label>
+      <select id="vencedora_id" name="vencedora_id">
+        <option value="">— Escolha —</option>
+        <% for (const o of obras) { %>
+          <option value="<%= o.id %>" <%= valores.vencedora_id === String(o.id) ? 'selected' : '' %>>
+            <%= o.titulo %><% if (o.autores) { %> — <%= o.autores %><% } %>
+          </option>
+        <% } %>
+      </select>
+
+      <label for="perdedora_id">Obra Perdedora (será arquivada)</label>
+      <select id="perdedora_id" name="perdedora_id">
+        <option value="">— Escolha —</option>
+        <% for (const o of obras) { %>
+          <option value="<%= o.id %>" <%= valores.perdedora_id === String(o.id) ? 'selected' : '' %>>
+            <%= o.titulo %><% if (o.autores) { %> — <%= o.autores %><% } %>
+          </option>
+        <% } %>
+      </select>
+
+      <label for="confirmacao">
+        Para confirmar, digite o <strong>título exato</strong> da obra perdedora
+      </label>
+      <input type="text" id="confirmacao" name="confirmacao" value="<%= valores.confirmacao %>">
+
+      <div class="acoes">
+        <button type="submit" class="perigo">Mesclar</button>
+        <a class="botao-ghost" href="/obras">Cancelar</a>
+      </div>
+    </form>
+  <% } %>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+</body>
+</html>
