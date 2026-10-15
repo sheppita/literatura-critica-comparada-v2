@@ -116,23 +116,39 @@
   <script>
     (function () {
       const textarea = document.getElementById("conteudo_markdown");
+      const selectTexto = document.getElementById("estado_texto");
+      const selectBiblio = document.getElementById("estado_bibliografia");
       const form = document.getElementById("form-ficha");
       const btnPreview = document.getElementById("btn-preview");
       const areaPreview = document.getElementById("area-preview");
 
-      let dirty = false;
-      const estadoInicial = textarea.value;
-      textarea.addEventListener("input", () => {
-        dirty = textarea.value !== estadoInicial;
-      });
+      // Snapshot do estado inicial de cada campo
+      const textoInicial = textarea.value;
+      const estadoTextoInicial = selectTexto.value;
+      const estadoBiblioInicial = selectBiblio.value;
+
+      function estaDirty() {
+        return (
+          textarea.value !== textoInicial ||
+          selectTexto.value !== estadoTextoInicial ||
+          selectBiblio.value !== estadoBiblioInicial
+        );
+      }
+
+      // Aviso antes de sair com alterações não salvas
       window.addEventListener("beforeunload", (e) => {
-        if (dirty) {
+        if (estaDirty()) {
           e.preventDefault();
           e.returnValue = "";
         }
       });
-      form.addEventListener("submit", () => { dirty = false; });
 
+      form.addEventListener("submit", () => {
+        // Desabilita o aviso ao enviar o formulário (o navegador vai sair da página)
+        window.removeEventListener("beforeunload", () => {});
+      });
+
+      // Botões de formatação
       const acoes = {
         bold: (sel) => "**" + sel + "**",
         italic: (sel) => "*" + sel + "*",
@@ -172,7 +188,6 @@
 
           textarea.focus();
           textarea.setSelectionRange(cursorStart, cursorEnd);
-          textarea.dispatchEvent(new Event("input"));
         });
       });
 

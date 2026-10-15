@@ -118,6 +118,22 @@
     </div>
   </form>
 
+  <!-- Template oculto: usado como molde para novas linhas de recorte -->
+  <template id="molde-recorte">
+    <div class="recorte-linha">
+      <select name="recorte_tipo[]">
+        <% for (const [valor, rotulo] of tiposRecorte) { %>
+          <option value="<%= valor %>"><%= rotulo %></option>
+        <% } %>
+      </select>
+      <input type="text" name="recorte_rotulo[]" placeholder="Rótulo (ex.: Cap. 3)">
+      <input type="text" name="recorte_inicio[]" placeholder="Início">
+      <input type="text" name="recorte_fim[]" placeholder="Fim">
+      <input type="text" name="recorte_observacao[]" placeholder="Observação">
+      <button type="button" class="btn-remover-recorte botao-ghost">×</button>
+    </div>
+  </template>
+
   <footer>
     <a href="/health">/health</a>
   </footer>
@@ -128,8 +144,8 @@
       const selectEdicao = document.getElementById("edicao_id");
       const listaRecortes = document.getElementById("lista-recortes");
       const btnAdd = document.getElementById("btn-add-recorte");
+      const molde = document.getElementById("molde-recorte");
 
-      // Carrega edições da obra selecionada
       async function carregarEdicoes() {
         const obraId = selectObra.value;
         selectEdicao.innerHTML = '<option value="">— Edição não especificada —</option>';
@@ -152,29 +168,13 @@
       }
 
       selectObra.addEventListener("change", carregarEdicoes);
-      // Se já havia uma obra selecionada (recarregamento pós-erro), carrega edições
       if (selectObra.value) carregarEdicoes();
 
-      // Adicionar recorte
       btnAdd.addEventListener("click", () => {
-        const div = document.createElement("div");
-        div.className = "recorte-linha";
-        div.innerHTML = `
-          <select name="recorte_tipo[]">
-            <% for (const [valor, rotulo] of tiposRecorte) { %>
-              <option value="<%= valor %>"><%= rotulo %></option>
-            <% } %>
-          </select>
-          <input type="text" name="recorte_rotulo[]" placeholder="Rótulo (ex.: Cap. 3)">
-          <input type="text" name="recorte_inicio[]" placeholder="Início">
-          <input type="text" name="recorte_fim[]" placeholder="Fim">
-          <input type="text" name="recorte_observacao[]" placeholder="Observação">
-          <button type="button" class="btn-remover-recorte botao-ghost">×</button>
-        `;
-        listaRecortes.appendChild(div);
+        const clone = molde.content.cloneNode(true);
+        listaRecortes.appendChild(clone);
       });
 
-      // Remover recorte
       listaRecortes.addEventListener("click", (e) => {
         if (e.target.classList.contains("btn-remover-recorte")) {
           const linha = e.target.closest(".recorte-linha");

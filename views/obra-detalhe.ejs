@@ -32,6 +32,11 @@
 
   <p class="meta-ficha">
     <span class="chip chip-suave"><%= obra.rotuloEstadoVerificacao %></span>
+    <% if (totalAulasDistintas > 0) { %>
+      <span class="versao">
+        <%= totalAulasDistintas %> aula<%= totalAulasDistintas === 1 ? '' : 's' %> distinta<%= totalAulasDistintas === 1 ? '' : 's' %>
+      </span>
+    <% } %>
   </p>
 
   <% if (obra.titulo_original || obra.idioma_original) { %>
@@ -97,7 +102,9 @@
     </p>
   <% } else { %>
     <p class="contador-resultados">
-      <%= usos.length %> uso<%= usos.length === 1 ? '' : 's' %> em aula<%= usos.length === 1 ? '' : 's' %>.
+      <%= usos.length %> uso<%= usos.length === 1 ? '' : 's' %>
+      em <%= totalAulasDistintas %> aula<%= totalAulasDistintas === 1 ? '' : 's' %>
+      distinta<%= totalAulasDistintas === 1 ? '' : 's' %>.
     </p>
 
     <ul class="lista-usos">
@@ -122,7 +129,8 @@
                 const inicio = r.inicio || '';
                 const fim = r.fim || '';
                 const intervalo = inicio && fim ? `${inicio}–${fim}` : (inicio || fim);
-                return (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
+                const base = (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
+                return r.observacao ? `${base} — ${r.observacao}` : base;
               }).join(' · ') %>
             </div>
           <% } %>

@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
-
   <% if (typeof salvo !== 'undefined' && salvo) { %>
     <div class="aviso-sucesso">
       Ficha salva com sucesso.
@@ -20,7 +19,7 @@
     </div>
   <% } %>
 
-    <p class="caminho">
+  <p class="caminho">
     <a href="/">Início</a>
     <% for (const u of cadeia) { %>
       › <a href="/unidades/<%= u.id %>"><%= u.titulo %></a>
@@ -68,45 +67,18 @@
         </p>
       <% } %>
 
-        <p style="margin-top: 2rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
-             <a href="/unidades/<%= unidade.id %>/ficha/editar" class="botao-ghost">
+      <p style="margin-top: 2rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <a href="/unidades/<%= unidade.id %>/ficha/editar" class="botao-ghost">
           Editar Ficha
-              </a>
-              <a href="/unidades/<%= unidade.id %>/ficha/versoes" class="botao-ghost">
+        </a>
+        <a href="/unidades/<%= unidade.id %>/ficha/versoes" class="botao-ghost">
           Histórico
-              </a>
-         </p>
-    <% } %>
-  <% } %>
-
-  <% if (nomeFilhoPlural) { %>
-    <h2>
-      <%= nomeFilhoPlural.charAt(0).toUpperCase() + nomeFilhoPlural.slice(1) %>
-    </h2>
-
-    <% if (filhos.length === 0) { %>
-      <p class="aviso-vazio">
-        Ainda não há <%= nomeFilhoPlural %> aqui.
+        </a>
       </p>
-    <% } else { %>
-      <ul>
-        <% for (const f of filhos) { %>
-          <li>
-            <% if (f.codigo) { %><strong><%= f.codigo %></strong> — <% } %>
-            <a href="/unidades/<%= f.id %>"><%= f.titulo %></a>
-          </li>
-        <% } %>
-      </ul>
     <% } %>
-
-    <p style="margin-top: 1.5rem;">
-      <a href="/unidades/nova?tipo=<%= proximoNivel %>&superior_id=<%= unidade.id %>">
-        + <%= rotuloNovoProximo %>
-      </a>
-    </p>
   <% } %>
 
-      <%# Bloco de usos — só para aula %>
+  <%# Bloco de usos — só para aula %>
   <% if (unidade.tipo === 'aula') { %>
     <hr class="divisor">
     <h2>Bibliografia</h2>
@@ -148,7 +120,8 @@
                   const inicio = r.inicio || '';
                   const fim = r.fim || '';
                   const intervalo = inicio && fim ? `${inicio}–${fim}` : (inicio || fim);
-                  return (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
+                  const base = (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
+                  return r.observacao ? `${base} — ${r.observacao}` : base;
                 }).join(' · ') %>
               </div>
             <% } %>
@@ -162,6 +135,34 @@
 
     <p style="margin-top: 1rem;">
       <a href="/unidades/<%= unidade.id %>/usos/novo" class="botao-ghost">+ Adicionar Obra</a>
+    </p>
+  <% } %>
+
+  <% if (nomeFilhoPlural) { %>
+    <hr class="divisor">
+    <h2>
+      <%= nomeFilhoPlural.charAt(0).toUpperCase() + nomeFilhoPlural.slice(1) %>
+    </h2>
+
+    <% if (filhos.length === 0) { %>
+      <p class="aviso-vazio">
+        Ainda não há <%= nomeFilhoPlural %> aqui.
+      </p>
+    <% } else { %>
+      <ul>
+        <% for (const f of filhos) { %>
+          <li>
+            <% if (f.codigo) { %><strong><%= f.codigo %></strong> — <% } %>
+            <a href="/unidades/<%= f.id %>"><%= f.titulo %></a>
+          </li>
+        <% } %>
+      </ul>
+    <% } %>
+
+    <p style="margin-top: 1.5rem;">
+      <a href="/unidades/nova?tipo=<%= proximoNivel %>&superior_id=<%= unidade.id %>">
+        + <%= rotuloNovoProximo %>
+      </a>
     </p>
   <% } %>
 

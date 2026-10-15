@@ -829,7 +829,6 @@ app.get("/obras", async (req, res) => {
       condicoes.push(`o.estado_verificacao = $${params.length}`);
     }
 
-    // Sempre esconder arquivadas
     condicoes.push(`o.arquivada = false`);
 
     const where = `WHERE ${condicoes.join(" AND ")}`;
@@ -865,14 +864,22 @@ app.get("/obras", async (req, res) => {
                      GROUP BY estado_revisao
                   ) sub2
               ) AS estados_revisao_contagem,
-              EXISTS (
+                            EXISTS (
                 SELECT 1
                   FROM usos u
-                  LEFT JOIN usos_recortes r ON r.uso_id = u.id
                  WHERE u.obra_id = o.id
                    AND (
                      u.edicao_id IS NULL
-                     OR r.tipo = 'a_conferir'
+                     OR EXISTS (
+                       SELECT 1 FROM usos_recortes r
+                        WHERE r.uso_id = u.id AND r.tipo = 'a_conferir'
+                     )
+                     OR (
+                       u.modalidade = 'parcial'
+                       AND NOT EXISTS (
+                         SELECT 1 FROM usos_recortes r2 WHERE r2.uso_id = u.id
+                       )
+                     )
                    )
               ) AS tem_pendencia
          FROM obras o
@@ -1066,7 +1073,6 @@ app.post("/obras/nova", async (req, res) => {
   }
 });
 
-// Rota: tela de mesclagem
 app.get("/obras/mesclar", async (req, res) => {
   const or = await pool.query(
     `SELECT o.id, o.titulo,
@@ -1092,7 +1098,6 @@ app.get("/obras/mesclar", async (req, res) => {
   });
 });
 
-// Rota: processar mesclagem
 app.post("/obras/mesclar", async (req, res) => {
   const vencedoraId = Number(req.body.vencedora_id) || null;
   const perdedoraId = Number(req.body.perdedora_id) || null;
@@ -1170,25 +1175,21 @@ app.post("/obras/mesclar", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // 1) Migrar edições
     await client.query(
       "UPDATE edicoes SET obra_id = $1 WHERE obra_id = $2",
       [vencedoraId, perdedoraId]
     );
 
-    // 2) Migrar usos
     await client.query(
       "UPDATE usos SET obra_id = $1, atualizado_em = now() WHERE obra_id = $2",
       [vencedoraId, perdedoraId]
     );
 
-    // 3) Migrar autores, sem duplicar
     const autoresPerdedora = await client.query(
       "SELECT nome, ordem FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
       [perdedoraId]
     );
 
-    // Pega a maior ordem atual na vencedora
     const maxOrdemR = await client.query(
       "SELECT COALESCE(MAX(ordem), 0) AS max_ordem FROM obras_autores WHERE obra_id = $1",
       [vencedoraId]
@@ -1209,13 +1210,11 @@ app.post("/obras/mesclar", async (req, res) => {
       }
     }
 
-    // 4) Arquivar perdedora
     await client.query(
       "UPDATE obras SET arquivada = true, atualizado_em = now() WHERE id = $1",
       [perdedoraId]
     );
 
-    // 5) Limpar autores órfãos da perdedora
     await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [perdedoraId]);
 
     await client.query("COMMIT");
@@ -1229,7 +1228,6 @@ app.post("/obras/mesclar", async (req, res) => {
   }
 });
 
-// Rota: formulário de nova decisão de revisão
 app.get("/obras/:id/decisoes/nova", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -1262,7 +1260,6 @@ app.get("/obras/:id/decisoes/nova", async (req, res) => {
     rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao
   }));
 
-  // Pré-selecionar usos que vieram pela querystring (?usos=1,2,3)
   let usosPreSelecionados = [];
   if (req.query.usos) {
     usosPreSelecionados = String(req.query.usos)
@@ -1285,7 +1282,6 @@ app.get("/obras/:id/decisoes/nova", async (req, res) => {
   });
 });
 
-// Rota: processar criação de decisão
 app.post("/obras/:id/decisoes/nova", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -1303,7 +1299,7 @@ app.post("/obras/:id/decisoes/nova", async (req, res) => {
 
   const estado = String(req.body.estado || "").trim();
   const justificativa = String(req.body.justificativa || "").trim();
-  const usosSelecionados = [].concat(req.body["usos[]"] || [])
+  const usosSelecionados = [].concat(req.body.usos || [])
     .map((s) => Number(s))
     .filter((n) => Number.isInteger(n) && n > 0);
 
@@ -1312,7 +1308,6 @@ app.post("/obras/:id/decisoes/nova", async (req, res) => {
   if (!justificativa) erros.push("A justificativa é obrigatória.");
   if (usosSelecionados.length === 0) erros.push("Selecione pelo menos um uso.");
 
-  // Valida que todos os usos pertencem a esta obra
   if (usosSelecionados.length > 0) {
     const vr = await pool.query(
       "SELECT id FROM usos WHERE id = ANY($1::bigint[]) AND obra_id = $2",
@@ -1372,7 +1367,6 @@ app.post("/obras/:id/decisoes/nova", async (req, res) => {
         "INSERT INTO decisoes_usos (decisao_id, uso_id) VALUES ($1, $2)",
         [decisaoId, usoId]
       );
-      // Também atualiza o estado de revisão dos usos envolvidos
       await client.query(
         "UPDATE usos SET estado_revisao = $1, atualizado_em = now() WHERE id = $2",
         [estado, usoId]
@@ -1390,7 +1384,6 @@ app.post("/obras/:id/decisoes/nova", async (req, res) => {
   }
 });
 
-// Rota: excluir decisão
 app.post("/obras/:id/decisoes/:decisao_id/excluir", async (req, res) => {
   const id = Number(req.params.id);
   const decisaoId = Number(req.params.decisao_id);
@@ -1472,7 +1465,14 @@ app.get("/obras/:id", async (req, res) => {
     }
   }
 
-  // Buscar decisões de revisão
+    // F6: contar aulas distintas em que a obra aparece
+  const totalAulasDistintasR = await pool.query(
+    "SELECT COUNT(DISTINCT aula_id)::int AS total FROM usos WHERE obra_id = $1",
+    [id]
+  );
+  const totalAulasDistintas = totalAulasDistintasR.rows[0].total;
+
+
   const decisoesR = await pool.query(
     `SELECT d.id, d.estado, d.justificativa, d.criado_em
        FROM decisoes_revisao d
@@ -1481,7 +1481,6 @@ app.get("/obras/:id", async (req, res) => {
     [id]
   );
 
-  // Buscar os usos ligados a cada decisão
   const decisoesIds = decisoesR.rows.map((d) => d.id);
   let usosPorDecisao = {};
   let usoInfoPorId = {};
@@ -1507,7 +1506,6 @@ app.get("/obras/:id", async (req, res) => {
       .map((uid) => usoInfoPorId[uid])
       .filter(Boolean);
 
-    // A decisão está "possivelmente vencida" se algum uso foi alterado depois dela
     const dataDecisao = new Date(d.criado_em);
     const vencida = usosDaDecisao.some(
       (u) => new Date(u.atualizado_em) > dataDecisao
@@ -1545,12 +1543,13 @@ app.get("/obras/:id", async (req, res) => {
 
   const salvo = req.query.salvo === "1";
 
-  res.render("obra-detalhe", {
+    res.render("obra-detalhe", {
     titulo: obra.titulo,
     obra,
     autores: autoresR.rows,
     edicoes,
     usos,
+    totalAulasDistintas,
     decisoes,
     salvo
   });
@@ -1672,11 +1671,13 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
   const observacoes = String(req.body.observacoes || "").trim() || null;
   const estado_revisao = String(req.body.estado_revisao || "").trim();
 
-  const rotulos = [].concat(req.body["recorte_rotulo[]"] || []);
-  const tipos = [].concat(req.body["recorte_tipo[]"] || []);
-  const inicios = [].concat(req.body["recorte_inicio[]"] || []);
-  const fins = [].concat(req.body["recorte_fim[]"] || []);
-  const observacoesRec = [].concat(req.body["recorte_observacao[]"] || []);
+  // CORREÇÃO: o Express com `extended: true` remove os colchetes
+  // dos nomes dos campos. Lemos sem colchetes.
+  const rotulos = [].concat(req.body.recorte_rotulo || []);
+  const tipos = [].concat(req.body.recorte_tipo || []);
+  const inicios = [].concat(req.body.recorte_inicio || []);
+  const fins = [].concat(req.body.recorte_fim || []);
+  const observacoesRec = [].concat(req.body.recorte_observacao || []);
 
   const erros = [];
   if (!obra_id) erros.push("Escolha uma obra.");
