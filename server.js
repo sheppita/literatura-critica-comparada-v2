@@ -541,37 +541,49 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
   if (!ROTULO_ESTADO_TEXTO[estado_texto]) erros.push("Estado do texto inválido.");
   if (!ROTULO_ESTADO_BIBLIOGRAFIA[estado_bibliografia]) erros.push("Estado da bibliografia inválido.");
 
-  let ficha = null;
   const fr = await pool.query(
     `SELECT id, conteudo_markdown, estado_texto, estado_bibliografia, versao_atual
        FROM fichas WHERE aula_id = $1`,
     [id]
   );
-  if (fr.rows.length === 0) {
+  const ficha = fr.rows.length > 0 ? fr.rows[0] : null;
+  if (!ficha) {
     erros.push("Ficha não encontrada para esta aula.");
-  } else {
-    ficha = fr.rows[0];
   }
 
-  if (erros.length > 0) {
+  // Função auxiliar: renderiza o editor preservando o que veio no body
+  async function renderizarEditorComErros(mensagens, conflitoAtivo) {
     const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
     return res.status(400).render("ficha-editor", {
       titulo: `Editar Ficha — ${unidade.titulo}`,
       unidade,
       ficha: ficha || { versao_atual: 1 },
       cadeia,
-      valores: { conteudo_markdown, estado_texto, estado_bibliografia },
-      erros,
+      valores: {
+        conteudo_markdown,
+        estado_texto,
+        estado_bibliografia
+      },
+      erros: mensagens,
       estadosTexto: Object.entries(ROTULO_ESTADO_TEXTO),
       estadosBibliografia: Object.entries(ROTULO_ESTADO_BIBLIOGRAFIA),
-      conflito: null
+      conflito: conflitoAtivo
     });
   }
 
+  if (erros.length > 0) {
+    return renderizarEditorComErros(erros, null);
+  }
+
+  // F2: verificação atômica de versão. Se a versão que a usuária abriu
+  // não for mais a atual, e não foi forçado, é conflito.
+  // F1: em vez de redirecionar (que descarta o body), renderizamos o editor
+  // com os valores do body + aviso de conflito.
   if (!forcar && versaoQueAbri > 0 && versaoQueAbri !== ficha.versao_atual) {
-    return res.redirect(
-      `/unidades/${id}/ficha/editar?conflito=1&versao_que_abri=${versaoQueAbri}`
-    );
+    return renderizarEditorComErros([], {
+      versaoQueAbri,
+      versaoAtual: ficha.versao_atual
+    });
   }
 
   const mudou =
@@ -579,32 +591,66 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     ficha.estado_texto !== estado_texto ||
     ficha.estado_bibliografia !== estado_bibliografia;
 
-  if (mudou) {
-    const novaVersao = ficha.versao_atual + 1;
+  if (!mudou) {
+    return res.redirect(`/unidades/${id}?salvo=0`);
+  }
 
-    await pool.query(
+  // F2 + F3: salvamento atômico + transação.
+  // O UPDATE só pega se versao_atual ainda for a que a usuária abriu
+  // (a menos que forcar=1). Se não pegar, foi conflito por baixo dos panos.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const updateR = await client.query(
       `UPDATE fichas
           SET conteudo_markdown = $1,
               estado_texto = $2,
               estado_bibliografia = $3,
-              versao_atual = $4,
+              versao_atual = versao_atual + 1,
               atualizado_em = now()
-        WHERE aula_id = $5`,
-      [conteudo_markdown, estado_texto, estado_bibliografia, novaVersao, id]
+        WHERE id = $4
+          AND ($5::boolean = true OR versao_atual = $6)
+        RETURNING versao_atual`,
+      [conteudo_markdown, estado_texto, estado_bibliografia, ficha.id, forcar, ficha.versao_atual]
     );
 
+    if (updateR.rows.length === 0) {
+      await client.query("ROLLBACK");
+      // Alguém salvou no meio do caminho (conflito por baixo dos panos).
+      // Recarrega a versão atual do banco para mostrar o conflito.
+      const frAtual = await pool.query(
+        "SELECT versao_atual FROM fichas WHERE id = $1",
+        [ficha.id]
+      );
+      const versaoAtualAgora = frAtual.rows[0].versao_atual;
+      return renderizarEditorComErros([], {
+        versaoQueAbri,
+        versaoAtual: versaoAtualAgora
+      });
+    }
+
+    const novaVersao = updateR.rows[0].versao_atual;
     const motivo = forcar ? "Salvamento Forçado (conflito)" : "Salvamento Manual";
 
-    await pool.query(
+    await client.query(
       `INSERT INTO fichas_versoes
          (ficha_id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia, motivo)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [ficha.id, novaVersao, conteudo_markdown, estado_texto, estado_bibliografia, motivo]
     );
 
+    await client.query("COMMIT");
     res.redirect(`/unidades/${id}?salvo=1`);
-  } else {
-    res.redirect(`/unidades/${id}?salvo=0`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao salvar ficha:", err.message);
+    return renderizarEditorComErros(
+      ["Erro interno ao salvar. Nada foi gravado."],
+      null
+    );
+  } finally {
+    client.release();
   }
 });
 
@@ -763,34 +809,47 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
   }
   const versao = vr.rows[0];
 
-  const novaVersao = ficha.versao_atual + 1;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  await pool.query(
-    `UPDATE fichas
-        SET conteudo_markdown = $1,
-            estado_texto = $2,
-            estado_bibliografia = $3,
-            versao_atual = $4,
-            atualizado_em = now()
-      WHERE id = $5`,
-    [versao.conteudo_markdown, versao.estado_texto, versao.estado_bibliografia, novaVersao, ficha.id]
-  );
+    const updateR = await client.query(
+      `UPDATE fichas
+          SET conteudo_markdown = $1,
+              estado_texto = $2,
+              estado_bibliografia = $3,
+              versao_atual = versao_atual + 1,
+              atualizado_em = now()
+        WHERE id = $4
+        RETURNING versao_atual`,
+      [versao.conteudo_markdown, versao.estado_texto, versao.estado_bibliografia, ficha.id]
+    );
 
-  await pool.query(
-    `INSERT INTO fichas_versoes
-       (ficha_id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia, motivo)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [
-      ficha.id,
-      novaVersao,
-      versao.conteudo_markdown,
-      versao.estado_texto,
-      versao.estado_bibliografia,
-      `Restauração da v${versao.numero_versao}`
-    ]
-  );
+    const novaVersao = updateR.rows[0].versao_atual;
 
-  res.redirect(`/unidades/${id}?salvo=1`);
+    await client.query(
+      `INSERT INTO fichas_versoes
+         (ficha_id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia, motivo)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        ficha.id,
+        novaVersao,
+        versao.conteudo_markdown,
+        versao.estado_texto,
+        versao.estado_bibliografia,
+        `Restauração da v${versao.numero_versao}`
+      ]
+    );
+
+    await client.query("COMMIT");
+    res.redirect(`/unidades/${id}?salvo=1`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao restaurar versão:", err.message);
+    res.status(500).type("text/plain").send("Erro interno ao restaurar. Nada foi alterado.");
+  } finally {
+    client.release();
+  }
 });
 
 // ----- Fim das rotas de ficha -----
