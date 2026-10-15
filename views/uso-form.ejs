@@ -14,10 +14,10 @@
       › <a href="/unidades/<%= u.id %>"><%= u.titulo %></a>
     <% } %>
     › <a href="/unidades/<%= aula.id %>"><%= aula.titulo %></a>
-    › Adicionar Obra
+    › <%= modo === 'editar' ? 'Editar Obra' : 'Adicionar Obra' %>
   </p>
 
-  <h1>Adicionar Obra</h1>
+  <h1><%= modo === 'editar' ? 'Editar Obra da Aula' : 'Adicionar Obra' %></h1>
   <p class="subtitulo">Aula: <%= aula.titulo %></p>
 
   <% if (erros && erros.length > 0) { %>
@@ -31,7 +31,7 @@
     </div>
   <% } %>
 
-  <form method="POST" action="/unidades/<%= aula.id %>/usos/novo" id="form-uso">
+  <form method="POST" action="<%= acao %>" id="form-uso">
     <label for="obra_id">Obra</label>
     <select id="obra_id" name="obra_id">
       <option value="">— Escolha uma obra —</option>
@@ -41,13 +41,8 @@
         </option>
       <% } %>
     </select>
-    <% if (obras.length === 0) { %>
-      <p class="detalhe-suave">
-        Nenhuma obra cadastrada. <a href="/obras/nova">Cadastrar uma agora</a>.
-      </p>
-    <% } %>
 
-    <label for="edicao_id">Edição <span class="ajuda">(opcional; deixe em branco se não souber)</span></label>
+    <label for="edicao_id">Edição <span class="ajuda">(opcional)</span></label>
     <select id="edicao_id" name="edicao_id">
       <option value="">— Edição não especificada —</option>
       <% for (const e of edicoes) { %>
@@ -114,11 +109,10 @@
 
     <div class="acoes">
       <button type="submit">Salvar</button>
-      <a class="botao-ghost" href="/unidades/<%= aula.id %>">Cancelar</a>
+      <a class="botao-ghost" href="<%= cancelarUrl %>">Cancelar</a>
     </div>
   </form>
 
-  <!-- Template oculto: usado como molde para novas linhas de recorte -->
   <template id="molde-recorte">
     <div class="recorte-linha">
       <select name="recorte_tipo[]">
@@ -146,8 +140,12 @@
       const btnAdd = document.getElementById("btn-add-recorte");
       const molde = document.getElementById("molde-recorte");
 
-      async function carregarEdicoes() {
+      // Guarda a edição pré-selecionada no carregamento inicial (caso venha do banco)
+      const edicaoInicial = selectEdicao.value;
+
+      async function carregarEdicoes(preservarSelecao) {
         const obraId = selectObra.value;
+        const selecaoAtual = preservarSelecao ? selectEdicao.value : null;
         selectEdicao.innerHTML = '<option value="">— Edição não especificada —</option>';
         if (!obraId) return;
         try {
@@ -160,6 +158,9 @@
             if (e.ano) rotulo += ", " + e.ano;
             if (e.numero_edicao) rotulo += " (" + e.numero_edicao + ")";
             opt.textContent = rotulo;
+            if (selecaoAtual && String(e.id) === String(selecaoAtual)) {
+              opt.selected = true;
+            }
             selectEdicao.appendChild(opt);
           }
         } catch (err) {
@@ -167,8 +168,13 @@
         }
       }
 
-      selectObra.addEventListener("change", carregarEdicoes);
-      if (selectObra.value) carregarEdicoes();
+      // No carregamento inicial, se a obra já tem edição selecionada (modo editar),
+      // recarrega as edições mas preserva a seleção.
+      if (selectObra.value) {
+        carregarEdicoes(true);
+      }
+
+      selectObra.addEventListener("change", () => carregarEdicoes(false));
 
       btnAdd.addEventListener("click", () => {
         const clone = molde.content.cloneNode(true);

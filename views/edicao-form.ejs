@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a> › <a href="/obras">Bibliografia</a> ›
+    <a href="/obras/<%= obra.id %>"><%= obra.titulo %></a> ›
+    <%= modo === 'editar' ? 'Editar Edição' : 'Nova Edição' %>
+  </p>
+
+  <h1><%= modo === 'editar' ? 'Editar Edição' : 'Nova Edição' %></h1>
+  <p class="subtitulo"><%= obra.titulo %></p>
+
+  <% if (erros && erros.length > 0) { %>
+    <div class="erros">
+      <strong>Não foi possível salvar:</strong>
+      <ul>
+        <% for (const e of erros) { %>
+          <li><%= e %></li>
+        <% } %>
+      </ul>
+    </div>
+  <% } %>
+
+  <form method="POST" action="<%= acao %>">
+    <label for="editora">Editora</label>
+    <input type="text" id="editora" name="editora" value="<%= valores.editora %>" autofocus>
+
+    <label for="ano">Ano</label>
+    <input type="text" id="ano" name="ano" value="<%= valores.ano %>">
+
+    <label for="numero_edicao">Número/identificação da edição <span class="ajuda">(ex.: "2ª", "Revista")</span></label>
+    <input type="text" id="numero_edicao" name="numero_edicao" value="<%= valores.numero_edicao %>">
+
+    <label for="traducao">Tradução <span class="ajuda">(quem traduziu)</span></label>
+    <input type="text" id="traducao" name="traducao" value="<%= valores.traducao %>">
+
+    <label for="idioma">Idioma desta edição</label>
+    <input type="text" id="idioma" name="idioma" value="<%= valores.idioma %>">
+
+    <label for="isbn">ISBN</label>
+    <input type="text" id="isbn" name="isbn" value="<%= valores.isbn %>">
+
+    <label for="link_referencia">Link de referência <span class="ajuda">(Drive, editora, etc.)</span></label>
+    <input type="text" id="link_referencia" name="link_referencia" value="<%= valores.link_referencia %>">
+
+    <label for="observacoes">Observações</label>
+    <textarea id="observacoes" name="observacoes"><%= valores.observacoes %></textarea>
+
+    <label for="estado_verificacao">Estado de verificação</label>
+    <select id="estado_verificacao" name="estado_verificacao">
+      <% for (const [valor, rotulo] of estadosVerificacao) { %>
+        <option value="<%= valor %>" <%= valores.estado_verificacao === valor ? 'selected' : '' %>>
+          <%= rotulo %>
+        </option>
+      <% } %>
+    </select>
+
+    <div class="acoes">
+      <button type="submit">Salvar</button>
+      <a class="botao-ghost" href="<%= cancelarUrl %>">Cancelar</a>
+    </div>
+  </form>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+</body>
+</html>

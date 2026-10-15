@@ -54,6 +54,10 @@
     <p><strong>Observações:</strong> <%= obra.observacoes %></p>
   <% } %>
 
+  <p style="margin-top: 1.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <a href="/obras/<%= obra.id %>/editar" class="botao-ghost">Editar Obra</a>
+  </p>
+
   <%# ===== EDIÇÕES ===== %>
   <hr class="divisor">
   <h2>Edições</h2>
@@ -66,14 +70,27 @@
     <ul class="lista-edicoes">
       <% for (const e of edicoes) { %>
         <li>
-          <strong><%= e.editora || 'Editora não informada' %></strong>
-          <% if (e.ano) { %>, <%= e.ano %><% } %>
-          <% if (e.numero_edicao) { %> · <%= e.numero_edicao %><% } %>
-          <% if (e.traducao) { %> · Trad.: <%= e.traducao %><% } %>
-          <% if (e.idioma) { %> · Idioma: <%= e.idioma %><% } %>
-          <span class="chip chip-suave" style="margin-left: 0.5rem;">
-            <%= e.rotuloEstadoVerificacao %>
-          </span>
+          <div style="display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline;">
+            <div>
+              <strong><%= e.editora || 'Editora não informada' %></strong>
+              <% if (e.ano) { %>, <%= e.ano %><% } %>
+              <% if (e.numero_edicao) { %> · <%= e.numero_edicao %><% } %>
+              <% if (e.traducao) { %> · Trad.: <%= e.traducao %><% } %>
+              <% if (e.idioma) { %> · Idioma: <%= e.idioma %><% } %>
+              <span class="chip chip-suave" style="margin-left: 0.5rem;">
+                <%= e.rotuloEstadoVerificacao %>
+              </span>
+            </div>
+            <div style="display: flex; gap: 0.4rem;">
+              <a href="/obras/<%= obra.id %>/edicoes/<%= e.id %>/editar" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar</a>
+              <form method="POST"
+                    action="/obras/<%= obra.id %>/edicoes/<%= e.id %>/excluir"
+                    style="display:inline;"
+                    onsubmit="return confirm('Excluir esta edição?');">
+                <button type="submit" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Excluir</button>
+              </form>
+            </div>
+          </div>
           <% if (e.isbn) { %>
             <div class="detalhe-suave">ISBN: <%= e.isbn %></div>
           <% } %>
@@ -91,6 +108,10 @@
       <% } %>
     </ul>
   <% } %>
+
+  <p style="margin-top: 1rem;">
+    <a href="/obras/<%= obra.id %>/edicoes/nova" class="botao-ghost">+ Adicionar Edição</a>
+  </p>
 
   <%# ===== USOS EM AULAS ===== %>
   <hr class="divisor">
@@ -137,6 +158,9 @@
           <% if (u.orientacao) { %>
             <div class="detalhe-suave"><em><%= u.orientacao %></em></div>
           <% } %>
+          <div style="margin-top: 0.4rem;">
+            <a href="/unidades/<%= u.aula_id %>/usos/<%= u.id %>/editar" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar Uso</a>
+          </div>
         </li>
       <% } %>
     </ul>

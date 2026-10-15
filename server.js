@@ -986,6 +986,10 @@ app.get("/obras", async (req, res) => {
 app.get("/obras/nova", (req, res) => {
   res.render("obra-form", {
     titulo: "Nova Obra",
+    modo: "criar",
+    acao: "/obras/nova",
+    cancelarUrl: "/obras",
+    obraId: null,
     valores: {
       titulo: "",
       titulo_original: "",
@@ -1612,6 +1616,638 @@ app.get("/obras/:id", async (req, res) => {
     decisoes,
     salvo
   });
+});
+
+// ----- Rotas de edição de obra e edições (R4) -----
+
+// Rota: formulário de editar obra
+app.get("/obras/:id/editar", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const or = await pool.query(
+    `SELECT id, titulo, titulo_original, idioma_original, tipo_material,
+            observacoes, estado_verificacao
+       FROM obras WHERE id = $1`,
+    [id]
+  );
+  if (or.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Obra não encontrada.");
+  }
+  const obra = or.rows[0];
+
+  const autoresR = await pool.query(
+    "SELECT nome FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
+    [id]
+  );
+  const autoresTexto = autoresR.rows.map((a) => a.nome).join("\n");
+
+  res.render("obra-form", {
+    titulo: `Editar Obra`,
+    modo: "editar",
+    acao: `/obras/${id}/editar`,
+    cancelarUrl: `/obras/${id}`,
+    obraId: id,
+    valores: {
+      titulo: obra.titulo,
+      titulo_original: obra.titulo_original || "",
+      idioma_original: obra.idioma_original || "",
+      tipo_material: obra.tipo_material,
+      autores: autoresTexto,
+      observacoes: obra.observacoes || "",
+      estado_verificacao: obra.estado_verificacao
+    },
+    erros: [],
+    tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
+    estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+  });
+});
+
+// Rota: salvar edição de obra
+app.post("/obras/:id/editar", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const or = await pool.query("SELECT id FROM obras WHERE id = $1", [id]);
+  if (or.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Obra não encontrada.");
+  }
+
+  const titulo = String(req.body.titulo || "").trim();
+  const titulo_original = String(req.body.titulo_original || "").trim() || null;
+  const idioma_original = String(req.body.idioma_original || "").trim() || null;
+  const tipo_material = String(req.body.tipo_material || "livro").trim();
+  const autoresRaw = String(req.body.autores || "").trim();
+  const observacoes = String(req.body.observacoes || "").trim() || null;
+  const estado_verificacao = String(req.body.estado_verificacao || "pendente").trim();
+
+  const erros = [];
+  if (!titulo) erros.push("O título da obra é obrigatório.");
+  if (!ROTULO_TIPO_MATERIAL[tipo_material]) erros.push("Tipo de material inválido.");
+  if (!ROTULO_ESTADO_VERIFICACAO[estado_verificacao]) erros.push("Estado de verificação inválido.");
+
+  const autores = autoresRaw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  if (erros.length > 0) {
+    return res.status(400).render("obra-form", {
+      titulo: "Editar Obra",
+      modo: "editar",
+      acao: `/obras/${id}/editar`,
+      cancelarUrl: `/obras/${id}`,
+      obraId: id,
+      valores: {
+        titulo,
+        titulo_original: titulo_original || "",
+        idioma_original: idioma_original || "",
+        tipo_material,
+        autores: autoresRaw,
+        observacoes: observacoes || "",
+        estado_verificacao
+      },
+      erros,
+      tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
+      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+    });
+  }
+
+  // Se ficou sem autor e estava verificada, marca incompleta
+  let estadoFinal = estado_verificacao;
+  if (autores.length === 0 && estadoFinal === "verificada") {
+    estadoFinal = "incompleta";
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    await client.query(
+      `UPDATE obras
+          SET titulo = $1,
+              titulo_original = $2,
+              idioma_original = $3,
+              tipo_material = $4,
+              observacoes = $5,
+              estado_verificacao = $6,
+              atualizado_em = now()
+        WHERE id = $7`,
+      [titulo, titulo_original, idioma_original, tipo_material, observacoes, estadoFinal, id]
+    );
+
+    // D37: apagar e reinserir autores
+    await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [id]);
+    for (let i = 0; i < autores.length; i++) {
+      await client.query(
+        "INSERT INTO obras_autores (obra_id, nome, ordem) VALUES ($1, $2, $3)",
+        [id, autores[i], i + 1]
+      );
+    }
+
+    await client.query("COMMIT");
+    res.redirect(`/obras/${id}?salvo=1`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao editar obra:", err.message);
+    res.status(500).type("text/plain").send("Erro interno ao salvar. Nada foi gravado.");
+  } finally {
+    client.release();
+  }
+});
+
+// Rota: formulário de nova edição
+app.get("/obras/:id/edicoes/nova", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const or = await pool.query("SELECT id, titulo FROM obras WHERE id = $1", [id]);
+  if (or.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Obra não encontrada.");
+  }
+  const obra = or.rows[0];
+
+  res.render("edicao-form", {
+    titulo: `Nova Edição — ${obra.titulo}`,
+    modo: "criar",
+    acao: `/obras/${id}/edicoes/nova`,
+    cancelarUrl: `/obras/${id}`,
+    obra,
+    valores: {
+      editora: "",
+      ano: "",
+      numero_edicao: "",
+      traducao: "",
+      idioma: "",
+      isbn: "",
+      link_referencia: "",
+      observacoes: "",
+      estado_verificacao: "pendente"
+    },
+    erros: [],
+    estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+  });
+});
+
+// Rota: salvar nova edição
+app.post("/obras/:id/edicoes/nova", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const or = await pool.query("SELECT id, titulo FROM obras WHERE id = $1", [id]);
+  if (or.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Obra não encontrada.");
+  }
+  const obra = or.rows[0];
+
+  const editora = String(req.body.editora || "").trim() || null;
+  const anoRaw = String(req.body.ano || "").trim();
+  const numero_edicao = String(req.body.numero_edicao || "").trim() || null;
+  const traducao = String(req.body.traducao || "").trim() || null;
+  const idioma = String(req.body.idioma || "").trim() || null;
+  const isbn = String(req.body.isbn || "").trim() || null;
+  const link_referencia = String(req.body.link_referencia || "").trim() || null;
+  const observacoes = String(req.body.observacoes || "").trim() || null;
+  const estado_verificacao = String(req.body.estado_verificacao || "pendente").trim();
+
+  const erros = [];
+  if (!ROTULO_ESTADO_VERIFICACAO[estado_verificacao]) erros.push("Estado de verificação inválido.");
+
+  let ano = null;
+  if (anoRaw) {
+    const n = Number(anoRaw);
+    if (!Number.isInteger(n) || n < 1000 || n > 2100) {
+      erros.push("Ano inválido (use um número entre 1000 e 2100).");
+    } else {
+      ano = n;
+    }
+  }
+
+  if (erros.length > 0) {
+    return res.status(400).render("edicao-form", {
+      titulo: `Nova Edição — ${obra.titulo}`,
+      modo: "criar",
+      acao: `/obras/${id}/edicoes/nova`,
+      cancelarUrl: `/obras/${id}`,
+      obra,
+      valores: { editora: editora || "", ano: anoRaw, numero_edicao: numero_edicao || "", traducao: traducao || "", idioma: idioma || "", isbn: isbn || "", link_referencia: link_referencia || "", observacoes: observacoes || "", estado_verificacao },
+      erros,
+      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+    });
+  }
+
+  await pool.query(
+    `INSERT INTO edicoes
+       (obra_id, editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, observacoes, estado_verificacao)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [id, editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, observacoes, estado_verificacao]
+  );
+
+  res.redirect(`/obras/${id}?salvo=1`);
+});
+
+// Rota: formulário de editar edição
+app.get("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
+  const id = Number(req.params.id);
+  const edicaoId = Number(req.params.edicao_id);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(edicaoId) || edicaoId <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const or = await pool.query("SELECT id, titulo FROM obras WHERE id = $1", [id]);
+  if (or.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Obra não encontrada.");
+  }
+  const obra = or.rows[0];
+
+  const er = await pool.query(
+    `SELECT id, editora, ano, numero_edicao, traducao, idioma, isbn,
+            link_referencia, observacoes, estado_verificacao
+       FROM edicoes WHERE id = $1 AND obra_id = $2`,
+    [edicaoId, id]
+  );
+  if (er.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Edição não encontrada.");
+  }
+  const edicao = er.rows[0];
+
+  res.render("edicao-form", {
+    titulo: `Editar Edição — ${obra.titulo}`,
+    modo: "editar",
+    acao: `/obras/${id}/edicoes/${edicaoId}/editar`,
+    cancelarUrl: `/obras/${id}`,
+    obra,
+    valores: {
+      editora: edicao.editora || "",
+      ano: edicao.ano != null ? String(edicao.ano) : "",
+      numero_edicao: edicao.numero_edicao || "",
+      traducao: edicao.traducao || "",
+      idioma: edicao.idioma || "",
+      isbn: edicao.isbn || "",
+      link_referencia: edicao.link_referencia || "",
+      observacoes: edicao.observacoes || "",
+      estado_verificacao: edicao.estado_verificacao
+    },
+    erros: [],
+    estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+  });
+});
+
+// Rota: salvar edição de edição
+app.post("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
+  const id = Number(req.params.id);
+  const edicaoId = Number(req.params.edicao_id);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(edicaoId) || edicaoId <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const or = await pool.query("SELECT id, titulo FROM obras WHERE id = $1", [id]);
+  if (or.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Obra não encontrada.");
+  }
+  const obra = or.rows[0];
+
+  const er = await pool.query("SELECT id FROM edicoes WHERE id = $1 AND obra_id = $2", [edicaoId, id]);
+  if (er.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Edição não encontrada.");
+  }
+
+  const editora = String(req.body.editora || "").trim() || null;
+  const anoRaw = String(req.body.ano || "").trim();
+  const numero_edicao = String(req.body.numero_edicao || "").trim() || null;
+  const traducao = String(req.body.traducao || "").trim() || null;
+  const idioma = String(req.body.idioma || "").trim() || null;
+  const isbn = String(req.body.isbn || "").trim() || null;
+  const link_referencia = String(req.body.link_referencia || "").trim() || null;
+  const observacoes = String(req.body.observacoes || "").trim() || null;
+  const estado_verificacao = String(req.body.estado_verificacao || "pendente").trim();
+
+  const erros = [];
+  if (!ROTULO_ESTADO_VERIFICACAO[estado_verificacao]) erros.push("Estado de verificação inválido.");
+
+  let ano = null;
+  if (anoRaw) {
+    const n = Number(anoRaw);
+    if (!Number.isInteger(n) || n < 1000 || n > 2100) {
+      erros.push("Ano inválido (use um número entre 1000 e 2100).");
+    } else {
+      ano = n;
+    }
+  }
+
+  if (erros.length > 0) {
+    return res.status(400).render("edicao-form", {
+      titulo: `Editar Edição — ${obra.titulo}`,
+      modo: "editar",
+      acao: `/obras/${id}/edicoes/${edicaoId}/editar`,
+      cancelarUrl: `/obras/${id}`,
+      obra,
+      valores: { editora: editora || "", ano: anoRaw, numero_edicao: numero_edicao || "", traducao: traducao || "", idioma: idioma || "", isbn: isbn || "", link_referencia: link_referencia || "", observacoes: observacoes || "", estado_verificacao },
+      erros,
+      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+    });
+  }
+
+  await pool.query(
+    `UPDATE edicoes
+        SET editora = $1, ano = $2, numero_edicao = $3, traducao = $4, idioma = $5,
+            isbn = $6, link_referencia = $7, observacoes = $8, estado_verificacao = $9,
+            atualizado_em = now()
+      WHERE id = $10`,
+    [editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, observacoes, estado_verificacao, edicaoId]
+  );
+
+  res.redirect(`/obras/${id}?salvo=1`);
+});
+
+// Rota: excluir edição (D35: bloqueia se em uso; D36: exclusão direta se não usada)
+app.post("/obras/:id/edicoes/:edicao_id/excluir", async (req, res) => {
+  const id = Number(req.params.id);
+  const edicaoId = Number(req.params.edicao_id);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(edicaoId) || edicaoId <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const er = await pool.query(
+    "SELECT id FROM edicoes WHERE id = $1 AND obra_id = $2",
+    [edicaoId, id]
+  );
+  if (er.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Edição não encontrada.");
+  }
+
+  const emUsoR = await pool.query(
+    "SELECT COUNT(*)::int AS total FROM usos WHERE edicao_id = $1",
+    [edicaoId]
+  );
+  const emUso = emUsoR.rows[0].total;
+
+  if (emUso > 0) {
+    return res.status(400).type("text/plain").send(
+      `Esta edição está em uso em ${emUso} indicação(ões). Remova ou reatribua os usos antes de excluir.`
+    );
+  }
+
+  await pool.query("DELETE FROM edicoes WHERE id = $1", [edicaoId]);
+
+  res.redirect(`/obras/${id}?salvo=1`);
+});
+
+// ----- Rotas de edição de uso (R4) -----
+
+// Rota: formulário de editar uso
+app.get("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
+  const id = Number(req.params.id);
+  const usoId = Number(req.params.uso_id);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(usoId) || usoId <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const ur = await pool.query(
+    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (ur.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const aula = ur.rows[0];
+  if (aula.tipo !== "aula") {
+    return res.status(400).type("text/plain").send("Só aulas têm usos.");
+  }
+
+  const usoR = await pool.query(
+    `SELECT id, obra_id, edicao_id, papel, modalidade, orientacao, observacoes, estado_revisao
+       FROM usos WHERE id = $1 AND aula_id = $2`,
+    [usoId, id]
+  );
+  if (usoR.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Uso não encontrado.");
+  }
+  const uso = usoR.rows[0];
+
+  const or = await pool.query(
+    `SELECT o.id, o.titulo,
+            COALESCE(
+              (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                 FROM obras_autores oa WHERE oa.obra_id = o.id),
+              ''
+            ) AS autores
+       FROM obras o
+      WHERE o.arquivada = false
+      ORDER BY o.titulo`
+  );
+
+  const er = await pool.query(
+    `SELECT id, editora, ano, numero_edicao, idioma
+       FROM edicoes WHERE obra_id = $1
+      ORDER BY ano NULLS LAST, id`,
+    [uso.obra_id]
+  );
+
+  const rr = await pool.query(
+    `SELECT rotulo, tipo, inicio, fim, observacao
+       FROM usos_recortes WHERE uso_id = $1 ORDER BY ordem, id`,
+    [usoId]
+  );
+
+  const recortes = rr.rows.length > 0 ? rr.rows : [
+    { rotulo: "", tipo: "capitulo", inicio: "", fim: "", observacao: "" }
+  ];
+
+  const cadeia = await cadeiaDeSuperiores(aula.superior_id);
+
+  res.render("uso-form", {
+    titulo: `Editar Obra — ${aula.titulo}`,
+    aula,
+    cadeia,
+    obras: or.rows,
+    edicoes: er.rows,
+    valores: {
+      obra_id: String(uso.obra_id),
+      edicao_id: uso.edicao_id ? String(uso.edicao_id) : "",
+      papel: uso.papel,
+      modalidade: uso.modalidade,
+      orientacao: uso.orientacao || "",
+      observacoes: uso.observacoes || "",
+      estado_revisao: uso.estado_revisao,
+      recortes
+    },
+    erros: [],
+    modo: "editar",
+    acao: `/unidades/${id}/usos/${usoId}/editar`,
+    cancelarUrl: `/unidades/${id}`,
+    papeis: Object.entries(ROTULO_PAPEL),
+    modalidades: Object.entries(ROTULO_MODALIDADE),
+    estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO),
+    tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
+  });
+});
+
+// Rota: salvar edição de uso
+app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
+  const id = Number(req.params.id);
+  const usoId = Number(req.params.uso_id);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(usoId) || usoId <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const ur = await pool.query(
+    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (ur.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const aula = ur.rows[0];
+  if (aula.tipo !== "aula") {
+    return res.status(400).type("text/plain").send("Só aulas têm usos.");
+  }
+
+  const usoR = await pool.query(
+    "SELECT id FROM usos WHERE id = $1 AND aula_id = $2",
+    [usoId, id]
+  );
+  if (usoR.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Uso não encontrado.");
+  }
+
+  const obra_id = Number(req.body.obra_id) || null;
+  const edicao_id = Number(req.body.edicao_id) || null;
+  const papel = String(req.body.papel || "").trim();
+  const modalidade = String(req.body.modalidade || "").trim();
+  const orientacao = String(req.body.orientacao || "").trim() || null;
+  const observacoes = String(req.body.observacoes || "").trim() || null;
+  const estado_revisao = String(req.body.estado_revisao || "").trim();
+
+  const rotulos = [].concat(req.body.recorte_rotulo || []);
+  const tipos = [].concat(req.body.recorte_tipo || []);
+  const inicios = [].concat(req.body.recorte_inicio || []);
+  const fins = [].concat(req.body.recorte_fim || []);
+  const observacoesRec = [].concat(req.body.recorte_observacao || []);
+
+  const erros = [];
+  if (!obra_id) erros.push("Escolha uma obra.");
+  if (!ROTULO_PAPEL[papel]) erros.push("Papel inválido.");
+  if (!ROTULO_MODALIDADE[modalidade]) erros.push("Modalidade inválida.");
+  if (!ROTULO_ESTADO_REVISAO[estado_revisao]) erros.push("Estado de revisão inválido.");
+
+  if (obra_id) {
+    const o = await pool.query("SELECT id, arquivada FROM obras WHERE id = $1", [obra_id]);
+    if (o.rows.length === 0) erros.push("Obra não encontrada.");
+    else if (o.rows[0].arquivada) erros.push("Esta obra está arquivada.");
+  }
+
+  if (edicao_id) {
+    const e = await pool.query("SELECT id, obra_id FROM edicoes WHERE id = $1", [edicao_id]);
+    if (e.rows.length === 0) erros.push("Edição não encontrada.");
+    else if (e.rows[0].obra_id !== obra_id) erros.push("A edição não pertence à obra selecionada.");
+  }
+
+  const recortes = [];
+  for (let i = 0; i < tipos.length; i++) {
+    const tipo = String(tipos[i] || "").trim();
+    if (!ROTULO_RECORTE_TIPO[tipo]) continue;
+    const rotulo = String(rotulos[i] || "").trim() || null;
+    const inicio = String(inicios[i] || "").trim() || null;
+    const fim = String(fins[i] || "").trim() || null;
+    const observacao = String(observacoesRec[i] || "").trim() || null;
+    if (!rotulo && !inicio && !fim && !observacao && tipo !== "integral" && tipo !== "a_conferir") {
+      continue;
+    }
+    recortes.push({ rotulo, tipo, inicio, fim, observacao });
+  }
+
+  if (erros.length > 0) {
+    const or = await pool.query(
+      `SELECT o.id, o.titulo,
+              COALESCE(
+                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                   FROM obras_autores oa WHERE oa.obra_id = o.id),
+                ''
+              ) AS autores
+         FROM obras o
+        WHERE o.arquivada = false
+        ORDER BY o.titulo`
+    );
+    let edicoes = [];
+    if (obra_id) {
+      const er = await pool.query(
+        `SELECT id, editora, ano, numero_edicao, idioma
+           FROM edicoes WHERE obra_id = $1
+          ORDER BY ano NULLS LAST, id`,
+        [obra_id]
+      );
+      edicoes = er.rows;
+    }
+    const cadeia = await cadeiaDeSuperiores(aula.superior_id);
+    return res.status(400).render("uso-form", {
+      titulo: `Editar Obra — ${aula.titulo}`,
+      aula,
+      cadeia,
+      obras: or.rows,
+      edicoes,
+      valores: {
+        obra_id: obra_id ? String(obra_id) : "",
+        edicao_id: edicao_id ? String(edicao_id) : "",
+        papel, modalidade, orientacao: orientacao || "",
+        observacoes: observacoes || "",
+        estado_revisao,
+        recortes: recortes.length > 0 ? recortes : [
+          { rotulo: "", tipo: "capitulo", inicio: "", fim: "", observacao: "" }
+        ]
+      },
+      erros,
+      modo: "editar",
+      acao: `/unidades/${id}/usos/${usoId}/editar`,
+      cancelarUrl: `/unidades/${id}`,
+      papeis: Object.entries(ROTULO_PAPEL),
+      modalidades: Object.entries(ROTULO_MODALIDADE),
+      estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO),
+      tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    await client.query(
+      `UPDATE usos
+          SET obra_id = $1, edicao_id = $2, papel = $3, modalidade = $4,
+              orientacao = $5, observacoes = $6, estado_revisao = $7,
+              atualizado_em = now()
+        WHERE id = $8`,
+      [obra_id, edicao_id, papel, modalidade, orientacao, observacoes, estado_revisao, usoId]
+    );
+
+    // D38: apagar e reinserir recortes
+    await client.query("DELETE FROM usos_recortes WHERE uso_id = $1", [usoId]);
+    for (let i = 0; i < recortes.length; i++) {
+      const r = recortes[i];
+      await client.query(
+        `INSERT INTO usos_recortes (uso_id, rotulo, tipo, inicio, fim, observacao, ordem)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [usoId, r.rotulo, r.tipo, r.inicio, r.fim, r.observacao, i + 1]
+      );
+    }
+
+    await client.query("COMMIT");
+    res.redirect(`/unidades/${id}?salvo=1`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao editar uso:", err.message);
+    res.status(500).type("text/plain").send("Erro interno ao salvar. Nada foi gravado.");
+  } finally {
+    client.release();
+  }
 });
 
 // ----- Fim das rotas de bibliografia -----

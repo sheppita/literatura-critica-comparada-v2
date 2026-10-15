@@ -96,7 +96,10 @@
                 <a href="/obras/<%= u.obra_id %>"><%= u.obra_titulo %></a>
                 <% if (u.obra_autores) { %> — <%= u.obra_autores %><% } %>
               </span>
-              <span class="uso-acoes">
+                                          
+              <span class="uso-acoes" style="display: flex; gap: 0.4rem;">
+                <a href="/unidades/<%= unidade.id %>/usos/<%= u.id %>/editar"
+                   class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar</a>
                 <form method="POST"
                       action="/unidades/<%= unidade.id %>/usos/<%= u.id %>/excluir"
                       style="display:inline;"
@@ -104,6 +107,7 @@
                   <button type="submit" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Remover</button>
                 </form>
               </span>
+                      
             </div>
             <div class="detalhe-suave">
               <%= u.rotuloPapel %> · <%= u.rotuloModalidade %> · <%= u.rotuloEstadoRevisao %>

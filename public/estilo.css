@@ -664,3 +664,26 @@ h2 {
 .lista-checkbox li {
   margin-bottom: 0.4rem;
 }
+
+/* Formulário de edição */
+h2 {
+  font-size: 1.15rem;
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+select {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #d8c9a8;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 1rem;
+  background: #fffdf7;
+  color: var(--texto);
+}
+select:focus {
+  outline: none;
+  border-color: var(--terracota);
+  box-shadow: 0 0 0 3px rgba(184, 92, 56, 0.15);
+}
