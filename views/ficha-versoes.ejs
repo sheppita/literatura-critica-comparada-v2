@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %></title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a>
+    <% for (const u of cadeia) { %>
+      › <a href="/unidades/<%= u.id %>"><%= u.titulo %></a>
+    <% } %>
+    › <a href="/unidades/<%= unidade.id %>"><%= unidade.titulo %></a>
+    › Histórico
+  </p>
+
+  <h1>Histórico de Versões</h1>
+  <p class="subtitulo"><%= unidade.titulo %></p>
+
+  <p class="aviso-vazio">
+    Versão atual: <strong>v<%= ficha.versao_atual %></strong>.
+    Abaixo estão as versões gravadas no histórico.
+  </p>
+
+  <% if (versoes.length === 0) { %>
+    <p class="aviso-vazio">
+      Nenhuma versão gravada ainda. Versões são criadas quando você salva
+      uma ficha com conteúdo (ou com estado alterado).
+    </p>
+  <% } else { %>
+    <table class="tabela-versoes">
+      <thead>
+        <tr>
+          <th>Versão</th>
+          <th>Data</th>
+          <th>Estado do Texto</th>
+          <th>Estado da Bibliografia</th>
+          <th>Motivo</th>
+          <th>Tamanho</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const v of versoes) { %>
+          <tr>
+            <td><strong>v<%= v.numero_versao %></strong></td>
+            <td><%= new Date(v.criado_em).toLocaleString('pt-BR') %></td>
+            <td><%= v.rotuloEstadoTexto %></td>
+            <td><%= v.rotuloEstadoBibliografia %></td>
+            <td><%= v.motivo || '—' %></td>
+            <td><%= v.tamanho %> chars</td>
+            <td>
+              <a href="/unidades/<%= unidade.id %>/ficha/versoes/<%= v.numero_versao %>">Ver</a>
+            </td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  <% } %>
+
+  <p style="margin-top: 2rem;">
+    <a href="/unidades/<%= unidade.id %>" class="botao-ghost">Voltar para a Ficha</a>
+  </p>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+</body>
+</html>

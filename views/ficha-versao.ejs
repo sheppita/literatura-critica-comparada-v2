@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %></title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a>
+    <% for (const u of cadeia) { %>
+      › <a href="/unidades/<%= u.id %>"><%= u.titulo %></a>
+    <% } %>
+    › <a href="/unidades/<%= unidade.id %>"><%= unidade.titulo %></a>
+    › <a href="/unidades/<%= unidade.id %>/ficha/versoes">Histórico</a>
+    › v<%= versao.numero_versao %>
+  </p>
+
+  <h1>Versão v<%= versao.numero_versao %></h1>
+  <p class="subtitulo"><%= unidade.titulo %></p>
+
+  <p class="meta-ficha">
+    <span class="chip"><%= versao.rotuloEstadoTexto %></span>
+    <span class="chip chip-suave"><%= versao.rotuloEstadoBibliografia %></span>
+    <span class="versao"><%= new Date(versao.criado_em).toLocaleString('pt-BR') %></span>
+    <% if (versao.motivo) { %>
+      <span class="versao">— <%= versao.motivo %></span>
+    <% } %>
+  </p>
+
+  <% if (versao.conteudo_html) { %>
+    <div class="ficha-conteudo">
+      <%- versao.conteudo_html %>
+    </div>
+  <% } else { %>
+    <p class="aviso-vazio">
+      Esta versão está em branco.
+    </p>
+  <% } %>
+
+  <div class="acoes" style="margin-top: 2rem; flex-wrap: wrap;">
+    <form method="POST"
+          action="/unidades/<%= unidade.id %>/ficha/versoes/<%= versao.numero_versao %>/restaurar"
+          onsubmit="return confirm('Restaurar a v<%= versao.numero_versao %>? O conteúdo atual será substituído por esta versão. Uma nova versão (v<%= ficha.versao_atual + 1 %>) será criada no histórico.');">
+      <button type="submit">Restaurar Esta Versão</button>
+    </form>
+    <a href="/unidades/<%= unidade.id %>/ficha/versoes" class="botao-ghost">Voltar ao Histórico</a>
+    <a href="/unidades/<%= unidade.id %>" class="botao-ghost">Ir para a Ficha Atual</a>
+  </div>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+</body>
+</html>

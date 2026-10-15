@@ -392,3 +392,25 @@ h2 {
   border-radius: 6px;
   background: #fffdf7;
 }
+
+/* Tabela de versões */
+.tabela-versoes {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+.tabela-versoes th,
+.tabela-versoes td {
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--creme-escuro);
+}
+.tabela-versoes th {
+  color: var(--marrom);
+  font-weight: 700;
+  background: var(--creme-escuro);
+}
+.tabela-versoes tr:hover {
+  background: #fbf6e8;
+}

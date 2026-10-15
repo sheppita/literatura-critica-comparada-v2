@@ -56,11 +56,14 @@
         </p>
       <% } %>
 
-      <p style="margin-top: 2rem;">
-        <a href="/unidades/<%= unidade.id %>/ficha/editar" class="botao-ghost">
+        <p style="margin-top: 2rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+             <a href="/unidades/<%= unidade.id %>/ficha/editar" class="botao-ghost">
           Editar Ficha
-        </a>
-      </p>
+              </a>
+              <a href="/unidades/<%= unidade.id %>/ficha/versoes" class="botao-ghost">
+          Histórico
+              </a>
+         </p>
     <% } %>
   <% } %>
 

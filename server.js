@@ -557,6 +557,188 @@ app.post("/unidades/:id/ficha/preview", async (req, res) => {
   res.type("text/html").send(html);
 });
 
+// Rota: lista de versões da ficha
+app.get("/unidades/:id/ficha/versoes", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const ur = await pool.query(
+    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (ur.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const unidade = ur.rows[0];
+  if (unidade.tipo !== "aula") {
+    return res.status(400).type("text/plain").send("Só aulas têm ficha.");
+  }
+
+  const fr = await pool.query(
+    "SELECT id, versao_atual FROM fichas WHERE aula_id = $1",
+    [id]
+  );
+  if (fr.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Ficha não encontrada.");
+  }
+  const ficha = fr.rows[0];
+
+  const versoesR = await pool.query(
+    `SELECT id, numero_versao, estado_texto, estado_bibliografia, motivo, criado_em,
+            LENGTH(conteudo_markdown) AS tamanho
+       FROM fichas_versoes
+      WHERE ficha_id = $1
+      ORDER BY numero_versao DESC`,
+    [ficha.id]
+  );
+
+  const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
+
+  const versoes = versoesR.rows.map((v) => ({
+    ...v,
+    rotuloEstadoTexto: ROTULO_ESTADO_TEXTO[v.estado_texto] || v.estado_texto,
+    rotuloEstadoBibliografia: ROTULO_ESTADO_BIBLIOGRAFIA[v.estado_bibliografia] || v.estado_bibliografia
+  }));
+
+  res.render("ficha-versoes", {
+    titulo: `Histórico — ${unidade.titulo}`,
+    unidade,
+    ficha,
+    cadeia,
+    versoes
+  });
+});
+
+// Rota: visualizar uma versão específica
+app.get("/unidades/:id/ficha/versoes/:numero", async (req, res) => {
+  const id = Number(req.params.id);
+  const numero = Number(req.params.numero);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(numero) || numero <= 0) {
+    return res.status(400).type("text/plain").send("Id ou número inválido.");
+  }
+
+  const ur = await pool.query(
+    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (ur.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const unidade = ur.rows[0];
+  if (unidade.tipo !== "aula") {
+    return res.status(400).type("text/plain").send("Só aulas têm ficha.");
+  }
+
+  const fr = await pool.query(
+    "SELECT id, versao_atual FROM fichas WHERE aula_id = $1",
+    [id]
+  );
+  if (fr.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Ficha não encontrada.");
+  }
+  const ficha = fr.rows[0];
+
+  const vr = await pool.query(
+    `SELECT id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia,
+            motivo, criado_em
+       FROM fichas_versoes
+      WHERE ficha_id = $1 AND numero_versao = $2`,
+    [ficha.id, numero]
+  );
+  if (vr.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Versão não encontrada.");
+  }
+  const versao = vr.rows[0];
+
+  const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
+
+  versao.conteudo_html = versao.conteudo_markdown.trim()
+    ? marked.parse(versao.conteudo_markdown)
+    : null;
+  versao.rotuloEstadoTexto = ROTULO_ESTADO_TEXTO[versao.estado_texto] || versao.estado_texto;
+  versao.rotuloEstadoBibliografia =
+    ROTULO_ESTADO_BIBLIOGRAFIA[versao.estado_bibliografia] || versao.estado_bibliografia;
+
+  res.render("ficha-versao", {
+    titulo: `Versão v${versao.numero_versao} — ${unidade.titulo}`,
+    unidade,
+    ficha,
+    cadeia,
+    versao
+  });
+});
+
+// Rota: restaurar uma versão
+app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
+  const id = Number(req.params.id);
+  const numero = Number(req.params.numero);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(numero) || numero <= 0) {
+    return res.status(400).type("text/plain").send("Id ou número inválido.");
+  }
+
+  const ur = await pool.query(
+    "SELECT id, tipo, titulo FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (ur.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  if (ur.rows[0].tipo !== "aula") {
+    return res.status(400).type("text/plain").send("Só aulas têm ficha.");
+  }
+
+  const fr = await pool.query(
+    "SELECT id, versao_atual FROM fichas WHERE aula_id = $1",
+    [id]
+  );
+  if (fr.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Ficha não encontrada.");
+  }
+  const ficha = fr.rows[0];
+
+  const vr = await pool.query(
+    `SELECT numero_versao, conteudo_markdown, estado_texto, estado_bibliografia
+       FROM fichas_versoes
+      WHERE ficha_id = $1 AND numero_versao = $2`,
+    [ficha.id, numero]
+  );
+  if (vr.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Versão não encontrada.");
+  }
+  const versao = vr.rows[0];
+
+  const novaVersao = ficha.versao_atual + 1;
+
+  await pool.query(
+    `UPDATE fichas
+        SET conteudo_markdown = $1,
+            estado_texto = $2,
+            estado_bibliografia = $3,
+            versao_atual = $4,
+            atualizado_em = now()
+      WHERE id = $5`,
+    [versao.conteudo_markdown, versao.estado_texto, versao.estado_bibliografia, novaVersao, ficha.id]
+  );
+
+  await pool.query(
+    `INSERT INTO fichas_versoes
+       (ficha_id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia, motivo)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      ficha.id,
+      novaVersao,
+      versao.conteudo_markdown,
+      versao.estado_texto,
+      versao.estado_bibliografia,
+      `Restauração da v${versao.numero_versao}`
+    ]
+  );
+
+  res.redirect(`/unidades/${id}`);
+});
+
 app.get("/unidades/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
