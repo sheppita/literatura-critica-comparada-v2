@@ -8,7 +8,8 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
-<%- include('./partials/navbar') %>
+  <%- include('./partials/navbar') %>
+
   <p class="caminho">
     <a href="/">Início</a> › Bibliografia
   </p>
@@ -16,7 +17,7 @@
   <h1>Bibliografia</h1>
   <p class="subtitulo">Catálogo de obras</p>
 
-    <form method="GET" action="/obras" class="filtros-obras">
+  <form method="GET" action="/obras" class="filtros-obras">
     <input type="text" name="q" placeholder="Buscar por título ou autoria..."
            value="<%= filtros.q %>">
 
@@ -63,6 +64,7 @@
     <table class="tabela-versoes tabela-obras">
       <thead>
         <tr>
+          <th></th>
           <th>Título / Autoria</th>
           <th>Aparece em</th>
           <th>Eixos</th>
@@ -73,6 +75,11 @@
       <tbody>
         <% for (const o of obras) { %>
           <tr>
+            <td class="celula-capa">
+              <% if (o.capa_url) { %>
+                <img src="<%= o.capa_url %>" alt="" class="miniatura-capa">
+              <% } %>
+            </td>
             <td>
               <strong><a href="/obras/<%= o.id %>"><%= o.titulo %></a></strong>
               <% if (o.tem_pendencia) { %>
@@ -113,9 +120,7 @@
       </tbody>
     </table>
   <% } %>
-  <footer>
-    <a href="/health">/health</a>
-  </footer>
-<%- include('./partials/botoes-flutuantes') %>
+
+  <%- include('./partials/botoes-flutuantes') %>
 </body>
 </html>

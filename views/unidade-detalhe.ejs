@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
-<%- include('./partials/navbar') %>
+  <%- include('./partials/navbar') %>
 
   <% if (typeof salvo !== 'undefined' && salvo) { %>
     <div class="aviso-sucesso">
@@ -96,53 +96,58 @@
       <ul class="lista-usos-aula">
         <% for (const u of usosAula) { %>
           <li class="uso-aula-item">
-            <div class="uso-cabecalho">
-              <span class="uso-obra">
-                <a href="/obras/<%= u.obra_id %>"><%= u.obra_titulo %></a>
-                <% if (u.obra_autores) { %> — <%= u.obra_autores %><% } %>
-              </span>
-                                          
-              <span class="uso-acoes" style="display: flex; gap: 0.4rem;">
-                <a href="/unidades/<%= unidade.id %>/usos/<%= u.id %>/editar"
-                   class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar</a>
-                <form method="POST"
-                      action="/unidades/<%= unidade.id %>/usos/<%= u.id %>/excluir"
-                      style="display:inline;"
-                      onsubmit="return confirm('Remover esta obra da aula? A obra em si continua no catálogo.');">
-                  <button type="submit" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Remover</button>
-                </form>
-              </span>
-                      
-            </div>
-             <div class="detalhe-suave">
-              <%= u.rotuloPapel %> · <%= u.rotuloModalidade %> · <%= u.rotuloEstadoRevisao %>
-              <% if (u.edicao_id) { %>
-                · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
-              <% } else { %>
-                · <em>Edição não informada</em>
+            <div class="uso-com-capa">
+              <% if (u.edicao_capa_url) { %>
+                <img src="<%= u.edicao_capa_url %>" alt="" class="miniatura-capa miniatura-capa-uso">
               <% } %>
+              <div class="uso-corpo">
+                <div class="uso-cabecalho">
+                  <span class="uso-obra">
+                    <a href="/obras/<%= u.obra_id %>"><%= u.obra_titulo %></a>
+                    <% if (u.obra_autores) { %> — <%= u.obra_autores %><% } %>
+                  </span>
+                  <span class="uso-acoes" style="display: flex; gap: 0.4rem;">
+                    <a href="/unidades/<%= unidade.id %>/usos/<%= u.id %>/editar"
+                       class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar</a>
+                    <form method="POST"
+                          action="/unidades/<%= unidade.id %>/usos/<%= u.id %>/excluir"
+                          style="display:inline;"
+                          onsubmit="return confirm('Remover esta obra da aula? A obra em si continua no catálogo.');">
+                      <button type="submit" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Remover</button>
+                    </form>
+                  </span>
+                </div>
+                <div class="detalhe-suave">
+                  <%= u.rotuloPapel %> · <%= u.rotuloModalidade %> · <%= u.rotuloEstadoRevisao %>
+                  <% if (u.edicao_id) { %>
+                    · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
+                  <% } else { %>
+                    · <em>Edição não informada</em>
+                  <% } %>
+                </div>
+                <% if (u.recortes.length > 0) { %>
+                  <div class="detalhe-suave">
+                    Recortes:
+                    <%= u.recortes.map(r => {
+                      if (r.tipo === 'integral') return 'Obra integral';
+                      if (r.tipo === 'a_conferir') return 'A conferir';
+                      const inicio = r.inicio || '';
+                      const fim = r.fim || '';
+                      const intervalo = inicio && fim ? `${inicio}–${fim}` : (inicio || fim);
+                      const base = (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
+                      return r.observacao ? `${base} — ${r.observacao}` : base;
+                    }).join(' · ') %>
+                  </div>
+                <% } else if (u.modalidade === 'parcial') { %>
+                  <div class="detalhe-suave">
+                    Recortes: <em>Recorte não informado</em>
+                  </div>
+                <% } %>
+                <% if (u.orientacao) { %>
+                  <div class="detalhe-suave"><em><%= u.orientacao %></em></div>
+                <% } %>
+              </div>
             </div>
-            <% if (u.recortes.length > 0) { %>
-              <div class="detalhe-suave">
-                Recortes:
-                <%= u.recortes.map(r => {
-                  if (r.tipo === 'integral') return 'Obra integral';
-                  if (r.tipo === 'a_conferir') return 'A conferir';
-                  const inicio = r.inicio || '';
-                  const fim = r.fim || '';
-                  const intervalo = inicio && fim ? `${inicio}–${fim}` : (inicio || fim);
-                  const base = (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
-                  return r.observacao ? `${base} — ${r.observacao}` : base;
-                }).join(' · ') %>
-              </div>
-            <% } else if (u.modalidade === 'parcial') { %>
-              <div class="detalhe-suave">
-                Recortes: <em>Recorte não informado</em>
-              </div>
-            <% } %>
-            <% if (u.orientacao) { %>
-              <div class="detalhe-suave"><em><%= u.orientacao %></em></div>
-            <% } %>
           </li>
         <% } %>
       </ul>
@@ -187,9 +192,6 @@
     <a href="/unidades/<%= unidade.id %>/excluir">Excluir</a>
   </p>
 
-  <footer>
-    <a href="/health">/health</a>
-  </footer>
-<%- include('./partials/botoes-flutuantes') %>
+  <%- include('./partials/botoes-flutuantes') %>
 </body>
 </html>

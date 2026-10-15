@@ -1003,6 +1003,13 @@ app.get("/obras", async (req, res) => {
                      GROUP BY estado_revisao
                   ) sub2
               ) AS estados_revisao_contagem,
+              (
+                SELECT e.capa_url
+                  FROM edicoes e
+                 WHERE e.obra_id = o.id AND e.capa_url IS NOT NULL
+                 ORDER BY e.ano DESC NULLS LAST, e.id DESC
+                 LIMIT 1
+              ) AS capa_url,
               EXISTS (
                 SELECT 1
                   FROM usos u
@@ -1599,7 +1606,8 @@ app.get("/obras/:id", async (req, res) => {
     `SELECT u.id, u.papel, u.modalidade, u.orientacao, u.observacoes,
             u.estado_revisao, u.criado_em, u.atualizado_em,
             a.id AS aula_id, a.titulo AS aula_titulo, a.codigo AS aula_codigo,
-            e.id AS edicao_id, e.editora AS edicao_editora, e.ano AS edicao_ano
+            e.id AS edicao_id, e.editora AS edicao_editora, e.ano AS edicao_ano,
+            e.capa_url AS edicao_capa_url
        FROM usos u
        JOIN unidades a ON a.id = u.aula_id
        LEFT JOIN edicoes e ON e.id = u.edicao_id
@@ -2687,7 +2695,8 @@ app.get("/unidades/:id", async (req, res) => {
                    FROM obras_autores oa WHERE oa.obra_id = o.id),
                 ''
               ) AS obra_autores,
-              e.id AS edicao_id_ref, e.editora AS edicao_editora, e.ano AS edicao_ano
+              e.id AS edicao_id_ref, e.editora AS edicao_editora, e.ano AS edicao_ano,
+              e.capa_url AS edicao_capa_url
          FROM usos u
          JOIN obras o ON o.id = u.obra_id
          LEFT JOIN edicoes e ON e.id = u.edicao_id

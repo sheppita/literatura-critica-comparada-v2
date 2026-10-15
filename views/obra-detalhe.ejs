@@ -8,7 +8,8 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
-<%- include('./partials/navbar') %>
+  <%- include('./partials/navbar') %>
+
   <p class="caminho">
     <a href="/">Início</a> › <a href="/obras">Bibliografia</a> › <%= obra.titulo %>
   </p>
@@ -70,49 +71,46 @@
   <% } else { %>
     <ul class="lista-edicoes">
       <% for (const e of edicoes) { %>
-        <li>
-          <div style="display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline;">
-            <div>
-              <strong><%= e.editora || 'Editora não informada' %></strong>
-              <% if (e.ano) { %>, <%= e.ano %><% } %>
-              <% if (e.numero_edicao) { %> · <%= e.numero_edicao %><% } %>
-              <% if (e.traducao) { %> · Trad.: <%= e.traducao %><% } %>
-              <% if (e.idioma) { %> · Idioma: <%= e.idioma %><% } %>
-              <span class="chip chip-suave" style="margin-left: 0.5rem;">
-                <%= e.rotuloEstadoVerificacao %>
-              </span>
-            </div>
-            <div style="display: flex; gap: 0.4rem;">
-              <a href="/obras/<%= obra.id %>/edicoes/<%= e.id %>/editar" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar</a>
-              <form method="POST"
-                    action="/obras/<%= obra.id %>/edicoes/<%= e.id %>/excluir"
-                    style="display:inline;"
-                    onsubmit="return confirm('Excluir esta edição?');">
-                <button type="submit" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Excluir</button>
-              </form>
-            </div>
-          </div>
-          <% if (e.isbn) { %>
-            <div class="detalhe-suave">ISBN: <%= e.isbn %></div>
+        <li class="edicao-item">
+          <% if (e.capa_url) { %>
+            <img src="<%= e.capa_url %>" alt="" class="miniatura-capa miniatura-capa-edicao">
           <% } %>
-          <% if (e.link_referencia) { %>
-          <% if (u.caminho) { %>
-            <div class="detalhe-suave caminho-uso">
-              <%= u.caminho %>
+          <div class="edicao-conteudo">
+            <div style="display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; flex-wrap: wrap;">
+              <div>
+                <strong><%= e.editora || 'Editora não informada' %></strong>
+                <% if (e.ano) { %>, <%= e.ano %><% } %>
+                <% if (e.numero_edicao) { %> · <%= e.numero_edicao %><% } %>
+                <% if (e.traducao) { %> · Trad.: <%= e.traducao %><% } %>
+                <% if (e.idioma) { %> · Idioma: <%= e.idioma %><% } %>
+                <span class="chip chip-suave" style="margin-left: 0.5rem;">
+                  <%= e.rotuloEstadoVerificacao %>
+                </span>
+              </div>
+              <div style="display: flex; gap: 0.4rem;">
+                <a href="/obras/<%= obra.id %>/edicoes/<%= e.id %>/editar" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar</a>
+                <form method="POST"
+                      action="/obras/<%= obra.id %>/edicoes/<%= e.id %>/excluir"
+                      style="display:inline;"
+                      onsubmit="return confirm('Excluir esta edição?');">
+                  <button type="submit" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Excluir</button>
+                </form>
+              </div>
             </div>
-          <% } %>
-          <div class="detalhe-suave">
-            Papel: <%= u.rotuloPapel %> · Modalidade: <%= u.rotuloModalidade %> · Revisão: <%= u.rotuloEstadoRevisao %>
-            <% if (u.edicao_id) { %>
-              · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
-            <% } else { %>
-              · <em>Edição não informada</em>
+            <% if (e.isbn) { %>
+              <div class="detalhe-suave">ISBN: <%= e.isbn %></div>
+            <% } %>
+            <% if (e.link_referencia) { %>
+              <div class="detalhe-suave">
+                <a href="<%= e.link_referencia %>" target="_blank" rel="noopener noreferrer">
+                  <%= e.link_referencia %>
+                </a>
+              </div>
+            <% } %>
+            <% if (e.observacoes) { %>
+              <div class="detalhe-suave"><%= e.observacoes %></div>
             <% } %>
           </div>
-          <% } %>
-          <% if (e.observacoes) { %>
-            <div class="detalhe-suave"><%= e.observacoes %></div>
-          <% } %>
         </li>
       <% } %>
     </ul>
@@ -140,40 +138,53 @@
     <ul class="lista-usos">
       <% for (const u of usos) { %>
         <li class="uso-item">
-          <div>
-            <a href="/unidades/<%= u.aula_id %>"><strong><%= u.aula_titulo %></strong></a>
-            <% if (u.aula_codigo) { %> · <%= u.aula_codigo %><% } %>
-          </div>
-          <div class="detalhe-suave">
-            Papel: <%= u.rotuloPapel %> · Modalidade: <%= u.rotuloModalidade %> · Revisão: <%= u.rotuloEstadoRevisao %>
-            <% if (u.edicao_id) { %>
-              · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
+          <div class="uso-com-capa">
+            <% if (u.edicao_capa_url) { %>
+              <img src="<%= u.edicao_capa_url %>" alt="" class="miniatura-capa miniatura-capa-uso">
             <% } %>
-          </div>
-          <% if (u.recortes.length > 0) { %>
-            <div class="detalhe-suave">
-              Recortes:
-              <%= u.recortes.map(r => {
-                if (r.tipo === 'integral') return 'Obra integral';
-                if (r.tipo === 'a_conferir') return 'A conferir';
-                const inicio = r.inicio || '';
-                const fim = r.fim || '';
-                const intervalo = inicio && fim ? `${inicio}–${fim}` : (inicio || fim);
-                const base = (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
-                return r.observacao ? `${base} — ${r.observacao}` : base;
-              }).join(' · ') %>
+            <div class="uso-corpo">
+              <div>
+                <a href="/unidades/<%= u.aula_id %>"><strong><%= u.aula_titulo %></strong></a>
+                <% if (u.aula_codigo) { %> · <%= u.aula_codigo %><% } %>
+              </div>
+              <% if (u.caminho) { %>
+                <div class="detalhe-suave caminho-uso">
+                  <%= u.caminho %>
+                </div>
+              <% } %>
+              <div class="detalhe-suave">
+                Papel: <%= u.rotuloPapel %> · Modalidade: <%= u.rotuloModalidade %> · Revisão: <%= u.rotuloEstadoRevisao %>
+                <% if (u.edicao_id) { %>
+                  · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
+                <% } else { %>
+                  · <em>Edição não informada</em>
+                <% } %>
+              </div>
+              <% if (u.recortes.length > 0) { %>
+                <div class="detalhe-suave">
+                  Recortes:
+                  <%= u.recortes.map(r => {
+                    if (r.tipo === 'integral') return 'Obra integral';
+                    if (r.tipo === 'a_conferir') return 'A conferir';
+                    const inicio = r.inicio || '';
+                    const fim = r.fim || '';
+                    const intervalo = inicio && fim ? `${inicio}–${fim}` : (inicio || fim);
+                    const base = (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
+                    return r.observacao ? `${base} — ${r.observacao}` : base;
+                  }).join(' · ') %>
+                </div>
+              <% } else if (u.modalidade === 'parcial') { %>
+                <div class="detalhe-suave">
+                  Recortes: <em>Recorte não informado</em>
+                </div>
+              <% } %>
+              <% if (u.orientacao) { %>
+                <div class="detalhe-suave"><em><%= u.orientacao %></em></div>
+              <% } %>
+              <div style="margin-top: 0.4rem;">
+                <a href="/unidades/<%= u.aula_id %>/usos/<%= u.id %>/editar" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar Uso</a>
+              </div>
             </div>
-          <% } else if (u.modalidade === 'parcial') { %>
-            <div class="detalhe-suave">
-              Recortes: <em>Recorte não informado</em>
-            </div>
-          <% } %>
-          
-          <% if (u.orientacao) { %>
-            <div class="detalhe-suave"><em><%= u.orientacao %></em></div>
-          <% } %>
-          <div style="margin-top: 0.4rem;">
-            <a href="/unidades/<%= u.aula_id %>/usos/<%= u.id %>/editar" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar Uso</a>
           </div>
         </li>
       <% } %>
@@ -239,9 +250,6 @@
     <a href="/obras/mesclar" class="botao-ghost">Mesclar Obras</a>
   </p>
 
-  <footer>
-    <a href="/health">/health</a>
-  </footer>
-<%- include('./partials/botoes-flutuantes') %>
+  <%- include('./partials/botoes-flutuantes') %>
 </body>
 </html>

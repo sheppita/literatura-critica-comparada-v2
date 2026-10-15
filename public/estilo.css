@@ -891,3 +891,58 @@ body {
     text-align: center;
   }
 }
+
+/* Miniaturas de capa */
+.miniatura-capa {
+  width: 60px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--creme-escuro);
+  background: var(--creme-escuro);
+  display: block;
+}
+
+.celula-capa {
+  width: 72px;
+  padding-right: 0.5rem;
+  vertical-align: top;
+}
+
+/* Edição com capa ao lado */
+.edicao-item {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.edicao-conteudo {
+  flex: 1;
+  min-width: 0;
+}
+.miniatura-capa-edicao {
+  flex: 0 0 auto;
+}
+
+/* Uso com capa ao lado */
+.uso-com-capa {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+.uso-corpo {
+  flex: 1;
+  min-width: 0;
+}
+.miniatura-capa-uso {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 600px) {
+  .miniatura-capa {
+    width: 48px;
+    height: 72px;
+  }
+  .celula-capa {
+    width: 56px;
+  }
+}
