@@ -1092,6 +1092,7 @@ app.get("/obras/nova", (req, res) => {
       edicao_idioma: "",
       edicao_isbn: "",
       edicao_link: "",
+      edicao_capa_url: "",
       edicao_observacoes: "",
       edicao_estado: "pendente",
       incluir_edicao: false
@@ -1119,6 +1120,7 @@ app.post("/obras/nova", async (req, res) => {
   const edicao_idioma = String(req.body.edicao_idioma || "").trim() || null;
   const edicao_isbn = String(req.body.edicao_isbn || "").trim() || null;
   const edicao_link = String(req.body.edicao_link || "").trim() || null;
+  const edicao_capa_url = String(req.body.edicao_capa_url || "").trim() || null;
   const edicao_observacoes = String(req.body.edicao_observacoes || "").trim() || null;
   const edicao_estado = String(req.body.edicao_estado || "pendente").trim();
 
@@ -1156,6 +1158,7 @@ app.post("/obras/nova", async (req, res) => {
         edicao_editora: edicao_editora || "", edicao_ano: edicao_anoRaw, edicao_numero: edicao_numero || "",
         edicao_traducao: edicao_traducao || "", edicao_idioma: edicao_idioma || "",
         edicao_isbn: edicao_isbn || "", edicao_link: edicao_link || "",
+        edicao_capa_url: edicao_capa_url || "",
         edicao_observacoes: edicao_observacoes || "", edicao_estado,
         incluir_edicao
       },
@@ -1195,10 +1198,11 @@ app.post("/obras/nova", async (req, res) => {
       await client.query(
         `INSERT INTO edicoes
            (obra_id, editora, ano, numero_edicao, traducao, idioma, isbn,
-            link_referencia, observacoes, estado_verificacao)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            link_referencia, capa_url, observacoes, estado_verificacao)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [obraId, edicao_editora, edicao_ano, edicao_numero, edicao_traducao,
-         edicao_idioma, edicao_isbn, edicao_link, edicao_observacoes, edicao_estado]
+         edicao_idioma, edicao_isbn, edicao_link, edicao_capa_url,
+         edicao_observacoes, edicao_estado]
       );
     }
 
@@ -1219,6 +1223,7 @@ app.post("/obras/nova", async (req, res) => {
         edicao_editora: edicao_editora || "", edicao_ano: edicao_anoRaw, edicao_numero: edicao_numero || "",
         edicao_traducao: edicao_traducao || "", edicao_idioma: edicao_idioma || "",
         edicao_isbn: edicao_isbn || "", edicao_link: edicao_link || "",
+        edicao_capa_url: edicao_capa_url || "",
         edicao_observacoes: edicao_observacoes || "", edicao_estado,
         incluir_edicao
       },
@@ -2276,7 +2281,7 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   if (edicao_id) {
     const e = await pool.query("SELECT id, obra_id FROM edicoes WHERE id = $1", [edicao_id]);
     if (e.rows.length === 0) erros.push("Edição não encontrada.");
-    else if (e.rows[0].obra_id !== obra_id) erros.push("A edição não pertence à obra selecionada.");
+    else if (Number(e.rows[0].obra_id) !== Number(obra_id)) erros.push("A edição não pertence à obra selecionada.");
   }
 
   const recortes = [];
@@ -2515,7 +2520,7 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
     const e = await pool.query("SELECT id, obra_id FROM edicoes WHERE id = $1", [edicao_id]);
     if (e.rows.length === 0) {
       erros.push("Edição não encontrada.");
-    } else if (e.rows[0].obra_id !== obra_id) {
+    } else if (Number(e.rows[0].obra_id) !== Number(obra_id)) {
       erros.push("A edição não pertence à obra selecionada.");
     }
   }

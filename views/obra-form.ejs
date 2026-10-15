@@ -8,7 +8,8 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
-<%- include('./partials/navbar') %>
+  <%- include('./partials/navbar') %>
+
   <p class="caminho">
     <a href="/">Início</a> › <a href="/obras">Bibliografia</a> ›
     <% if (modo === 'editar') { %>
@@ -99,6 +100,10 @@
         <label for="edicao_link">Link de referência</label>
         <input type="text" id="edicao_link" name="edicao_link" value="<%= valores.edicao_link %>">
 
+        <label for="edicao_capa_url">URL da capa <span class="ajuda">(opcional; link direto para uma imagem)</span></label>
+        <input type="text" id="edicao_capa_url" name="edicao_capa_url" value="<%= valores.edicao_capa_url %>"
+               placeholder="https://...">
+
         <label for="edicao_observacoes">Observações da edição</label>
         <textarea id="edicao_observacoes" name="edicao_observacoes"><%= valores.edicao_observacoes %></textarea>
 
@@ -119,9 +124,7 @@
     </div>
   </form>
 
-  <footer>
-    <a href="/health">/health</a>
-  </footer>
+  <%- include('./partials/botoes-flutuantes') %>
 
   <% if (modo === 'criar') { %>
     <script>
@@ -136,6 +139,5 @@
       })();
     </script>
   <% } %>
-<%- include('./partials/botoes-flutuantes') %>
 </body>
 </html>
