@@ -416,6 +416,8 @@ app.post("/unidades/:id/excluir", async (req, res) => {
   }
 });
 
+// ----- Rotas de ficha -----
+
 app.get("/unidades/:id/ficha/editar", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -446,6 +448,15 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
 
   const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
 
+  // Mensagem de conflito, quando aplicável
+  let conflito = null;
+  if (req.query.conflito === "1") {
+    conflito = {
+      versaoQueAbri: Number(req.query.versao_que_abri) || 0,
+      versaoAtual: ficha.versao_atual
+    };
+  }
+
   res.render("ficha-editor", {
     titulo: `Editar Ficha — ${unidade.titulo}`,
     unidade,
@@ -458,7 +469,8 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
     },
     erros: [],
     estadosTexto: Object.entries(ROTULO_ESTADO_TEXTO),
-    estadosBibliografia: Object.entries(ROTULO_ESTADO_BIBLIOGRAFIA)
+    estadosBibliografia: Object.entries(ROTULO_ESTADO_BIBLIOGRAFIA),
+    conflito
   });
 });
 
@@ -483,6 +495,8 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
   const conteudo_markdown = String(req.body.conteudo_markdown || "");
   const estado_texto = String(req.body.estado_texto || "rascunho");
   const estado_bibliografia = String(req.body.estado_bibliografia || "pendente");
+  const versaoQueAbri = Number(req.body.versao_que_abri) || 0;
+  const forcar = String(req.body.forcar || "") === "1";
 
   const erros = [];
   if (!ROTULO_ESTADO_TEXTO[estado_texto]) erros.push("Estado do texto inválido.");
@@ -510,8 +524,16 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
       valores: { conteudo_markdown, estado_texto, estado_bibliografia },
       erros,
       estadosTexto: Object.entries(ROTULO_ESTADO_TEXTO),
-      estadosBibliografia: Object.entries(ROTULO_ESTADO_BIBLIOGRAFIA)
+      estadosBibliografia: Object.entries(ROTULO_ESTADO_BIBLIOGRAFIA),
+      conflito: null
     });
+  }
+
+  // Detecção de conflito: se a versão que abri não é a atual, e não foi forçado
+  if (!forcar && versaoQueAbri > 0 && versaoQueAbri !== ficha.versao_atual) {
+    return res.redirect(
+      `/unidades/${id}/ficha/editar?conflito=1&versao_que_abri=${versaoQueAbri}`
+    );
   }
 
   const mudou =
@@ -533,11 +555,13 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
       [conteudo_markdown, estado_texto, estado_bibliografia, novaVersao, id]
     );
 
+    const motivo = forcar ? "Salvamento Forçado (conflito)" : "Salvamento Manual";
+
     await pool.query(
       `INSERT INTO fichas_versoes
          (ficha_id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia, motivo)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [ficha.id, novaVersao, conteudo_markdown, estado_texto, estado_bibliografia, "Salvamento Manual"]
+      [ficha.id, novaVersao, conteudo_markdown, estado_texto, estado_bibliografia, motivo]
     );
 
     res.redirect(`/unidades/${id}?salvo=1`);
@@ -730,6 +754,8 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
 
   res.redirect(`/unidades/${id}?salvo=1`);
 });
+
+// ----- Fim das rotas de ficha -----
 
 app.get("/unidades/:id", async (req, res) => {
   const id = Number(req.params.id);

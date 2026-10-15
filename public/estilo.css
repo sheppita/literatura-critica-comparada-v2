@@ -432,3 +432,16 @@ h2 {
   border-radius: 0 6px 6px 0;
   margin-bottom: 1.5rem;
 }
+
+/* Aviso de conflito de versão */
+.aviso-conflito {
+  background: #fdf1d6;
+  border-left: 4px solid var(--mostarda);
+  padding: 1rem 1.25rem;
+  color: #6b4a1c;
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 1.5rem;
+}
+.aviso-conflito strong {
+  color: #8a5a1c;
+}

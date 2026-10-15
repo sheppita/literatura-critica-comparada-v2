@@ -20,6 +20,31 @@
   <h1>Editar Ficha</h1>
   <p class="subtitulo"><%= unidade.titulo %></p>
 
+  <% if (conflito) { %>
+    <div class="aviso-conflito">
+      <strong>Conflito de versão.</strong>
+      Você abriu esta ficha na <strong>v<%= conflito.versaoQueAbri %></strong>,
+      mas ela já está na <strong>v<%= conflito.versaoAtual %></strong>.
+      Alguém (ou você em outra aba) salvou uma nova versão nesse meio-tempo.
+      <p style="margin: 0.75rem 0 0;">
+        <a href="/unidades/<%= unidade.id %>/ficha/editar"
+           class="botao-ghost" style="margin-right: 0.5rem;">
+          Recarregar (Perder minhas mudanças)
+        </a>
+        <form method="POST" action="/unidades/<%= unidade.id %>/ficha/editar"
+              style="display: inline;"
+              onsubmit="return confirm('Isso vai sobrescrever a versão mais recente com o seu conteúdo. Tem certeza?');">
+          <input type="hidden" name="conteudo_markdown" value="<%= valores.conteudo_markdown %>">
+          <input type="hidden" name="estado_texto" value="<%= valores.estado_texto %>">
+          <input type="hidden" name="estado_bibliografia" value="<%= valores.estado_bibliografia %>">
+          <input type="hidden" name="versao_que_abri" value="<%= conflito.versaoQueAbri %>">
+          <input type="hidden" name="forcar" value="1">
+          <button type="submit" class="perigo">Salvar Mesmo Assim</button>
+        </form>
+      </p>
+    </div>
+  <% } %>
+
   <% if (erros && erros.length > 0) { %>
     <div class="erros">
       <strong>Não foi possível salvar:</strong>
@@ -32,6 +57,8 @@
   <% } %>
 
   <form method="POST" action="/unidades/<%= unidade.id %>/ficha/editar" id="form-ficha">
+    <input type="hidden" name="versao_que_abri" value="<%= ficha.versao_atual %>">
+
     <div class="linha-estados">
       <label for="estado_texto" class="label-inline">
         Estado do Texto
@@ -93,7 +120,6 @@
       const btnPreview = document.getElementById("btn-preview");
       const areaPreview = document.getElementById("area-preview");
 
-      // Aviso antes de sair com alterações não salvas
       let dirty = false;
       const estadoInicial = textarea.value;
       textarea.addEventListener("input", () => {
@@ -107,7 +133,6 @@
       });
       form.addEventListener("submit", () => { dirty = false; });
 
-      // Botões de formatação
       const acoes = {
         bold: (sel) => "**" + sel + "**",
         italic: (sel) => "*" + sel + "*",
@@ -140,7 +165,6 @@
           } else {
             novo = acoes[tipo](sel);
             textarea.value = textarea.value.substring(0, start) + novo + textarea.value.substring(end);
-            // coloca o cursor depois do prefixo, dentro dos delimitadores
             const prefixo = tipo === "bold" ? 2 : tipo === "italic" ? 1 : tipo === "h2" ? 3 : tipo === "h3" ? 4 : 1;
             cursorStart = start + prefixo;
             cursorEnd = start + novo.length - prefixo;
@@ -152,7 +176,6 @@
         });
       });
 
-      // Botão de pré-visualização
       btnPreview.addEventListener("click", async () => {
         try {
           const resposta = await fetch(
