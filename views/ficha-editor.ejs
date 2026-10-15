@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %></title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a>
+    <% for (const u of cadeia) { %>
+      › <a href="/unidades/<%= u.id %>"><%= u.titulo %></a>
+    <% } %>
+    › <a href="/unidades/<%= unidade.id %>"><%= unidade.titulo %></a>
+    › Editar Ficha
+  </p>
+
+  <h1>Editar Ficha</h1>
+  <p class="subtitulo"><%= unidade.titulo %></p>
+
+  <% if (erros && erros.length > 0) { %>
+    <div class="erros">
+      <strong>Não foi possível salvar:</strong>
+      <ul>
+        <% for (const e of erros) { %>
+          <li><%= e %></li>
+        <% } %>
+      </ul>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/unidades/<%= unidade.id %>/ficha/editar" id="form-ficha">
+    <div class="linha-estados">
+      <label for="estado_texto" class="label-inline">
+        Estado do Texto
+        <select id="estado_texto" name="estado_texto">
+          <% for (const [valor, rotulo] of estadosTexto) { %>
+            <option value="<%= valor %>" <%= valores.estado_texto === valor ? 'selected' : '' %>>
+              <%= rotulo %>
+            </option>
+          <% } %>
+        </select>
+      </label>
+
+      <label for="estado_bibliografia" class="label-inline">
+        Estado da Bibliografia
+        <select id="estado_bibliografia" name="estado_bibliografia">
+          <% for (const [valor, rotulo] of estadosBibliografia) { %>
+            <option value="<%= valor %>" <%= valores.estado_bibliografia === valor ? 'selected' : '' %>>
+              <%= rotulo %>
+            </option>
+          <% } %>
+        </select>
+      </label>
+
+      <span class="versao-atual">Versão atual: <strong>v<%= ficha.versao_atual %></strong></span>
+    </div>
+
+    <div class="barra-formatacao" role="toolbar" aria-label="Formatação">
+      <button type="button" data-md="bold" title="Negrito">B</button>
+      <button type="button" data-md="italic" title="Itálico"><em>I</em></button>
+      <button type="button" data-md="h2" title="Título nível 2">H2</button>
+      <button type="button" data-md="h3" title="Título nível 3">H3</button>
+      <button type="button" data-md="ul" title="Lista com marcadores">• Lista</button>
+      <button type="button" data-md="ol" title="Lista numerada">1. Lista</button>
+      <button type="button" data-md="quote" title="Citação">" Citação</button>
+      <button type="button" data-md="link" title="Link">🔗 Link</button>
+      <button type="button" data-md="hr" title="Separador">— Separador</button>
+    </div>
+
+    <textarea id="conteudo_markdown" name="conteudo_markdown"
+              class="editor-markdown"><%= valores.conteudo_markdown %></textarea>
+
+    <div class="acoes">
+      <button type="submit">Salvar</button>
+      <button type="button" id="btn-preview" class="ghost">Pré-visualizar</button>
+      <a class="botao-ghost" href="/unidades/<%= unidade.id %>">Cancelar</a>
+    </div>
+  </form>
+
+  <div id="area-preview" class="ficha-conteudo" style="display:none;"></div>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+
+  <script>
+    (function () {
+      const textarea = document.getElementById("conteudo_markdown");
+      const form = document.getElementById("form-ficha");
+      const btnPreview = document.getElementById("btn-preview");
+      const areaPreview = document.getElementById("area-preview");
+
+      // Aviso antes de sair com alterações não salvas
+      let dirty = false;
+      const estadoInicial = textarea.value;
+      textarea.addEventListener("input", () => {
+        dirty = textarea.value !== estadoInicial;
+      });
+      window.addEventListener("beforeunload", (e) => {
+        if (dirty) {
+          e.preventDefault();
+          e.returnValue = "";
+        }
+      });
+      form.addEventListener("submit", () => { dirty = false; });
+
+      // Botões de formatação
+      const acoes = {
+        bold: (sel) => "**" + sel + "**",
+        italic: (sel) => "*" + sel + "*",
+        h2: (sel) => "## " + (sel || "Título"),
+        h3: (sel) => "### " + (sel || "Título"),
+        ul: (sel) => sel.split("\n").map(l => "- " + l).join("\n"),
+        ol: (sel) => sel.split("\n").map((l, i) => (i + 1) + ". " + l).join("\n"),
+        quote: (sel) => sel.split("\n").map(l => "> " + l).join("\n"),
+        link: (sel) => "[" + (sel || "texto") + "](https://)",
+        hr: () => "\n\n---\n\n"
+      };
+
+      document.querySelectorAll("[data-md]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const tipo = btn.getAttribute("data-md");
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const sel = textarea.value.substring(start, end);
+
+          let novo, cursorStart, cursorEnd;
+          if (tipo === "hr") {
+            novo = acoes.hr();
+            textarea.value = textarea.value.substring(0, start) + novo + textarea.value.substring(end);
+            cursorStart = cursorEnd = start + novo.length;
+          } else if (tipo === "ul" || tipo === "ol" || tipo === "quote") {
+            novo = acoes[tipo](sel || "item");
+            textarea.value = textarea.value.substring(0, start) + novo + textarea.value.substring(end);
+            cursorStart = start;
+            cursorEnd = start + novo.length;
+          } else {
+            novo = acoes[tipo](sel);
+            textarea.value = textarea.value.substring(0, start) + novo + textarea.value.substring(end);
+            // coloca o cursor depois do prefixo, dentro dos delimitadores
+            const prefixo = tipo === "bold" ? 2 : tipo === "italic" ? 1 : tipo === "h2" ? 3 : tipo === "h3" ? 4 : 1;
+            cursorStart = start + prefixo;
+            cursorEnd = start + novo.length - prefixo;
+          }
+
+          textarea.focus();
+          textarea.setSelectionRange(cursorStart, cursorEnd);
+          textarea.dispatchEvent(new Event("input"));
+        });
+      });
+
+      // Botão de pré-visualização
+      btnPreview.addEventListener("click", async () => {
+        try {
+          const resposta = await fetch(
+            "/unidades/<%= unidade.id %>/ficha/preview",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: "conteudo_markdown=" + encodeURIComponent(textarea.value)
+            }
+          );
+          const html = await resposta.text();
+          areaPreview.innerHTML = html;
+          areaPreview.style.display = "block";
+          areaPreview.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch (err) {
+          areaPreview.innerHTML = "<p><em>Erro ao pré-visualizar.</em></p>";
+          areaPreview.style.display = "block";
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

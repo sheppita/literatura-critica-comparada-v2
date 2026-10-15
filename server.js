@@ -3,6 +3,7 @@ import express from "express";
 import pg from "pg";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { marked } from "marked";
 
 const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -56,6 +57,18 @@ const NOME_FILHO_PLURAL = {
 };
 
 const TIPOS_COM_DESCRICAO = ["eixo", "disciplina", "modulo"];
+
+const ROTULO_ESTADO_TEXTO = {
+  rascunho: "Rascunho",
+  em_revisao: "Em Revisão",
+  consolidada: "Consolidada"
+};
+
+const ROTULO_ESTADO_BIBLIOGRAFIA = {
+  pendente: "Pendente",
+  em_conferencia: "Em Conferência",
+  conferida: "Conferida"
+};
 
 function aceitaDescricao(tipo) {
   return TIPOS_COM_DESCRICAO.includes(tipo);
@@ -190,12 +203,21 @@ app.post("/unidades/nova", async (req, res) => {
   );
   const ordem = ordemR.rows[0].proxima;
 
-  await pool.query(
+  const insertR = await pool.query(
     `INSERT INTO unidades
        (tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id`,
     [tipo, titulo, codigo, superiorId, ordem, descricao, pergunta]
   );
+
+  // Se criou uma aula, cria a ficha em branco automaticamente
+  if (tipo === "aula") {
+    await pool.query(
+      "INSERT INTO fichas (aula_id) VALUES ($1) ON CONFLICT (aula_id) DO NOTHING",
+      [insertR.rows[0].id]
+    );
+  }
 
   if (superiorId) {
     res.redirect(`/unidades/${superiorId}`);
@@ -395,6 +417,146 @@ app.post("/unidades/:id/excluir", async (req, res) => {
   }
 });
 
+// Rota: formulário de edição da ficha
+app.get("/unidades/:id/ficha/editar", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const ur = await pool.query(
+    "SELECT id, tipo, titulo, codigo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (ur.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const unidade = ur.rows[0];
+  if (unidade.tipo !== "aula") {
+    return res.status(400).type("text/plain").send("Só aulas têm ficha.");
+  }
+
+  const fr = await pool.query(
+    `SELECT id, conteudo_markdown, estado_texto, estado_bibliografia, versao_atual
+       FROM fichas WHERE aula_id = $1`,
+    [id]
+  );
+  if (fr.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Ficha não encontrada para esta aula.");
+  }
+  const ficha = fr.rows[0];
+
+  const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
+
+  res.render("ficha-editor", {
+    titulo: `Editar Ficha — ${unidade.titulo}`,
+    unidade,
+    ficha,
+    cadeia,
+    valores: {
+      conteudo_markdown: ficha.conteudo_markdown,
+      estado_texto: ficha.estado_texto,
+      estado_bibliografia: ficha.estado_bibliografia
+    },
+    erros: [],
+    estadosTexto: Object.entries(ROTULO_ESTADO_TEXTO),
+    estadosBibliografia: Object.entries(ROTULO_ESTADO_BIBLIOGRAFIA)
+  });
+});
+
+// Rota: processar salvamento da ficha
+app.post("/unidades/:id/ficha/editar", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const ur = await pool.query(
+    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (ur.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const unidade = ur.rows[0];
+  if (unidade.tipo !== "aula") {
+    return res.status(400).type("text/plain").send("Só aulas têm ficha.");
+  }
+
+  const conteudo_markdown = String(req.body.conteudo_markdown || "");
+  const estado_texto = String(req.body.estado_texto || "rascunho");
+  const estado_bibliografia = String(req.body.estado_bibliografia || "pendente");
+
+  const erros = [];
+  if (!ROTULO_ESTADO_TEXTO[estado_texto]) erros.push("Estado do texto inválido.");
+  if (!ROTULO_ESTADO_BIBLIOGRAFIA[estado_bibliografia]) erros.push("Estado da bibliografia inválido.");
+
+  let ficha = null;
+  const fr = await pool.query(
+    `SELECT id, conteudo_markdown, estado_texto, estado_bibliografia, versao_atual
+       FROM fichas WHERE aula_id = $1`,
+    [id]
+  );
+  if (fr.rows.length === 0) {
+    erros.push("Ficha não encontrada para esta aula.");
+  } else {
+    ficha = fr.rows[0];
+  }
+
+  if (erros.length > 0) {
+    const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
+    return res.status(400).render("ficha-editor", {
+      titulo: `Editar Ficha — ${unidade.titulo}`,
+      unidade,
+      ficha: ficha || { versao_atual: 1 },
+      cadeia,
+      valores: { conteudo_markdown, estado_texto, estado_bibliografia },
+      erros,
+      estadosTexto: Object.entries(ROTULO_ESTADO_TEXTO),
+      estadosBibliografia: Object.entries(ROTULO_ESTADO_BIBLIOGRAFIA)
+    });
+  }
+
+  // Detecta se houve mudança real (conteúdo, estado do texto ou estado da bibliografia)
+  const mudou =
+    ficha.conteudo_markdown !== conteudo_markdown ||
+    ficha.estado_texto !== estado_texto ||
+    ficha.estado_bibliografia !== estado_bibliografia;
+
+  if (mudou) {
+    const novaVersao = ficha.versao_atual + 1;
+
+    // Atualiza a ficha
+    await pool.query(
+      `UPDATE fichas
+          SET conteudo_markdown = $1,
+              estado_texto = $2,
+              estado_bibliografia = $3,
+              versao_atual = $4,
+              atualizado_em = now()
+        WHERE aula_id = $5`,
+      [conteudo_markdown, estado_texto, estado_bibliografia, novaVersao, id]
+    );
+
+    // Registra no histórico
+    await pool.query(
+      `INSERT INTO fichas_versoes
+         (ficha_id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia, motivo)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [ficha.id, novaVersao, conteudo_markdown, estado_texto, estado_bibliografia, "Salvamento Manual"]
+    );
+  }
+
+  res.redirect(`/unidades/${id}`);
+});
+
+// Rota: pré-visualização do Markdown (chamada via fetch do navegador)
+app.post("/unidades/:id/ficha/preview", async (req, res) => {
+  const conteudo = String(req.body.conteudo_markdown || "");
+  const html = conteudo.trim() ? marked.parse(conteudo) : "<p><em>(vazio)</em></p>";
+  res.type("text/html").send(html);
+});
+
 app.get("/unidades/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -418,6 +580,29 @@ app.get("/unidades/:id", async (req, res) => {
   const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
   const proximo = PROXIMO_NIVEL[unidade.tipo];
 
+  // Se for aula, busca a ficha
+  let ficha = null;
+  if (unidade.tipo === "aula") {
+    const fr = await pool.query(
+      `SELECT id, conteudo_markdown, estado_texto, estado_bibliografia,
+              versao_atual, criado_em, atualizado_em
+         FROM fichas
+        WHERE aula_id = $1`,
+      [id]
+    );
+    if (fr.rows.length > 0) {
+      const f = fr.rows[0];
+      ficha = {
+        ...f,
+        conteudo_html: f.conteudo_markdown.trim()
+          ? marked.parse(f.conteudo_markdown)
+          : null,
+        rotuloEstadoTexto: ROTULO_ESTADO_TEXTO[f.estado_texto],
+        rotuloEstadoBibliografia: ROTULO_ESTADO_BIBLIOGRAFIA[f.estado_bibliografia]
+      };
+    }
+  }
+
   res.render("unidade-detalhe", {
     titulo: unidade.titulo,
     unidade,
@@ -427,7 +612,8 @@ app.get("/unidades/:id", async (req, res) => {
     proximoNivel: proximo,
     rotuloProximo: proximo ? ROTULO_TIPO[proximo] : null,
     rotuloNovoProximo: proximo ? ROTULO_NOVO[proximo] : null,
-    nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo]
+    nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo],
+    ficha
   });
 });
 

@@ -31,6 +31,39 @@
     </div>
   <% } %>
 
+  <%# Bloco da ficha — só para aula %>
+  <% if (unidade.tipo === 'aula') { %>
+    <hr class="divisor">
+
+    <% if (!ficha) { %>
+      <p class="aviso-vazio">
+        Não há ficha registrada para esta aula.
+      </p>
+    <% } else { %>
+      <p class="meta-ficha">
+        <span class="chip"><%= ficha.rotuloEstadoTexto %></span>
+        <span class="chip chip-suave"><%= ficha.rotuloEstadoBibliografia %></span>
+        <span class="versao">v<%= ficha.versao_atual %></span>
+      </p>
+
+      <% if (ficha.conteudo_html) { %>
+        <div class="ficha-conteudo">
+          <%- ficha.conteudo_html %>
+        </div>
+      <% } else { %>
+        <p class="aviso-vazio">
+          Ficha ainda em branco.
+        </p>
+      <% } %>
+
+      <p style="margin-top: 2rem;">
+        <a href="/unidades/<%= unidade.id %>/ficha/editar" class="botao-ghost">
+          Editar Ficha
+        </a>
+      </p>
+    <% } %>
+  <% } %>
+
   <% if (nomeFilhoPlural) { %>
     <h2>
       <%= nomeFilhoPlural.charAt(0).toUpperCase() + nomeFilhoPlural.slice(1) %>
