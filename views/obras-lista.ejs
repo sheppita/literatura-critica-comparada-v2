@@ -71,7 +71,7 @@
       <tbody>
         <% for (const o of obras) { %>
           <tr>
-            <td><strong><%= o.titulo %></strong></td>
+            <td><strong><a href="/obras/<%= o.id %>"><%= o.titulo %></a></strong></td>
             <td><%= o.autores || '—' %></td>
             <td><%= o.rotuloTipoMaterial %></td>
             <td><%= o.total_edicoes %></td>

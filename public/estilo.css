@@ -512,3 +512,32 @@ h2 {
   font-size: 0.9rem;
   margin-top: 0.5rem;
 }
+
+/* Lista de edições e usos na página da obra */
+.lista-edicoes,
+.lista-usos {
+  list-style: none;
+  padding-left: 0;
+}
+
+.lista-edicoes li {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--creme-escuro);
+}
+.lista-edicoes li:last-child {
+  border-bottom: none;
+}
+
+.uso-item {
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.6rem;
+  background: var(--creme-escuro);
+  border-left: 4px solid var(--mostarda);
+  border-radius: 0 6px 6px 0;
+}
+
+.detalhe-suave {
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}

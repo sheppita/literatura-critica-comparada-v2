@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= obra.titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a> › <a href="/obras">Bibliografia</a> › <%= obra.titulo %>
+  </p>
+
+  <h1><%= obra.titulo %></h1>
+  <p class="subtitulo">
+    <%= obra.rotuloTipoMaterial %>
+    <% if (autores.length > 0) { %>
+      · <%= autores.map(a => a.nome).join(', ') %>
+    <% } %>
+  </p>
+
+  <p class="meta-ficha">
+    <span class="chip chip-suave"><%= obra.rotuloEstadoVerificacao %></span>
+  </p>
+
+  <% if (obra.titulo_original || obra.idioma_original) { %>
+    <p>
+      <% if (obra.titulo_original) { %>
+        <strong>Título original:</strong> <%= obra.titulo_original %><br>
+      <% } %>
+      <% if (obra.idioma_original) { %>
+        <strong>Idioma original:</strong> <%= obra.idioma_original %>
+      <% } %>
+    </p>
+  <% } %>
+
+  <% if (obra.observacoes) { %>
+    <p><strong>Observações:</strong> <%= obra.observacoes %></p>
+  <% } %>
+
+  <%# ===== EDIÇÕES ===== %>
+  <hr class="divisor">
+  <h2>Edições</h2>
+
+  <% if (edicoes.length === 0) { %>
+    <p class="aviso-vazio">
+      Nenhuma edição cadastrada ainda.
+    </p>
+  <% } else { %>
+    <ul class="lista-edicoes">
+      <% for (const e of edicoes) { %>
+        <li>
+          <strong><%= e.editora || 'Editora não informada' %></strong>
+          <% if (e.ano) { %>, <%= e.ano %><% } %>
+          <% if (e.numero_edicao) { %> · <%= e.numero_edicao %><% } %>
+          <% if (e.traducao) { %> · Trad.: <%= e.traducao %><% } %>
+          <% if (e.idioma) { %> · Idioma: <%= e.idioma %><% } %>
+          <span class="chip chip-suave" style="margin-left: 0.5rem;">
+            <%= e.rotuloEstadoVerificacao %>
+          </span>
+          <% if (e.isbn) { %>
+            <div class="detalhe-suave">ISBN: <%= e.isbn %></div>
+          <% } %>
+          <% if (e.link_referencia) { %>
+            <div class="detalhe-suave">
+              <a href="<%= e.link_referencia %>" target="_blank" rel="noopener noreferrer">
+                <%= e.link_referencia %>
+              </a>
+            </div>
+          <% } %>
+          <% if (e.observacoes) { %>
+            <div class="detalhe-suave"><%= e.observacoes %></div>
+          <% } %>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+
+  <%# ===== USOS EM AULAS ===== %>
+  <hr class="divisor">
+  <h2>Usos em Aulas</h2>
+
+  <% if (usos.length === 0) { %>
+    <p class="aviso-vazio">
+      Esta obra ainda não está associada a nenhuma aula.
+    </p>
+  <% } else { %>
+    <p class="contador-resultados">
+      <%= usos.length %> uso<%= usos.length === 1 ? '' : 's' %> em aula<%= usos.length === 1 ? '' : 's' %>.
+    </p>
+
+    <ul class="lista-usos">
+      <% for (const u of usos) { %>
+        <li class="uso-item">
+          <div>
+            <a href="/unidades/<%= u.aula_id %>"><strong><%= u.aula_titulo %></strong></a>
+            <% if (u.aula_codigo) { %> · <%= u.aula_codigo %><% } %>
+          </div>
+          <div class="detalhe-suave">
+            Papel: <%= u.papel %> · Modalidade: <%= u.modalidade %> · Revisão: <%= u.estado_revisao %>
+            <% if (u.edicao_id) { %>
+              · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
+            <% } %>
+          </div>
+          <% if (u.recortes.length > 0) { %>
+            <div class="detalhe-suave">
+              Recortes:
+              <%= u.recortes.map(r => {
+                if (r.tipo === 'integral') return 'Obra integral';
+                if (r.tipo === 'a_conferir') return 'A conferir';
+                const inicio = r.inicio || '';
+                const fim = r.fim || '';
+                const intervalo = inicio && fim ? `${inicio}–${fim}` : (inicio || fim);
+                return (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
+              }).join(' · ') %>
+            </div>
+          <% } %>
+          <% if (u.orientacao) { %>
+            <div class="detalhe-suave"><em><%= u.orientacao %></em></div>
+          <% } %>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+
+  <p style="margin-top: 2rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <a href="/obras" class="botao-ghost">Voltar à Bibliografia</a>
+  </p>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+</body>
+</html>

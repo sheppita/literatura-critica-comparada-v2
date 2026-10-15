@@ -70,6 +70,19 @@ const ROTULO_ESTADO_BIBLIOGRAFIA = {
   conferida: "Conferida"
 };
 
+const ROTULO_TIPO_MATERIAL = {
+  livro: "Livro",
+  ensaio: "Ensaio",
+  capitulo_coletanea: "Capítulo de Coletânea",
+  outro: "Outro"
+};
+
+const ROTULO_ESTADO_VERIFICACAO = {
+  pendente: "Pendente",
+  verificada: "Verificada",
+  incompleta: "Incompleta"
+};
+
 function aceitaDescricao(tipo) {
   return TIPOS_COM_DESCRICAO.includes(tipo);
 }
@@ -448,7 +461,6 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
 
   const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
 
-  // Mensagem de conflito, quando aplicável
   let conflito = null;
   if (req.query.conflito === "1") {
     conflito = {
@@ -529,7 +541,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     });
   }
 
-  // Detecção de conflito: se a versão que abri não é a atual, e não foi forçado
   if (!forcar && versaoQueAbri > 0 && versaoQueAbri !== ficha.versao_atual) {
     return res.redirect(
       `/unidades/${id}/ficha/editar?conflito=1&versao_que_abri=${versaoQueAbri}`
@@ -757,86 +768,8 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
 
 // ----- Fim das rotas de ficha -----
 
-app.get("/unidades/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const r = await pool.query(
-    "SELECT id, tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
-  const unidade = r.rows[0];
-
-  const filhosR = await pool.query(
-    "SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 ORDER BY ordem, id",
-    [id]
-  );
-
-  const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
-  const proximo = PROXIMO_NIVEL[unidade.tipo];
-
-  let ficha = null;
-  if (unidade.tipo === "aula") {
-    const fr = await pool.query(
-      `SELECT id, conteudo_markdown, estado_texto, estado_bibliografia,
-              versao_atual, criado_em, atualizado_em
-         FROM fichas
-        WHERE aula_id = $1`,
-      [id]
-    );
-    if (fr.rows.length > 0) {
-      const f = fr.rows[0];
-      ficha = {
-        ...f,
-        conteudo_html: f.conteudo_markdown.trim()
-          ? marked.parse(f.conteudo_markdown)
-          : null,
-        rotuloEstadoTexto: ROTULO_ESTADO_TEXTO[f.estado_texto],
-        rotuloEstadoBibliografia: ROTULO_ESTADO_BIBLIOGRAFIA[f.estado_bibliografia]
-      };
-    }
-  }
-
-  const salvo = req.query.salvo === "1";
-  const nadaMudou = req.query.salvo === "0";
-
-  res.render("unidade-detalhe", {
-    titulo: unidade.titulo,
-    unidade,
-    filhos: filhosR.rows,
-    cadeia,
-    rotuloTipo: ROTULO_TIPO[unidade.tipo],
-    proximoNivel: proximo,
-    rotuloProximo: proximo ? ROTULO_TIPO[proximo] : null,
-    rotuloNovoProximo: proximo ? ROTULO_NOVO[proximo] : null,
-    nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo],
-    ficha,
-    salvo,
-    nadaMudou
-  });
-});
-
 // ----- Rotas de bibliografia -----
 
-const ROTULO_TIPO_MATERIAL = {
-  livro: "Livro",
-  ensaio: "Ensaio",
-  capitulo_coletanea: "Capítulo de Coletânea",
-  outro: "Outro"
-};
-
-const ROTULO_ESTADO_VERIFICACAO = {
-  pendente: "Pendente",
-  verificada: "Verificada",
-  incompleta: "Incompleta"
-};
-
-// Rota: catálogo de obras
 app.get("/obras", async (req, res) => {
   try {
     const busca = String(req.query.q || "").trim();
@@ -910,7 +843,6 @@ app.get("/obras", async (req, res) => {
   }
 });
 
-// Rota: formulário de nova obra
 app.get("/obras/nova", (req, res) => {
   res.render("obra-form", {
     titulo: "Nova Obra",
@@ -922,7 +854,6 @@ app.get("/obras/nova", (req, res) => {
       autores: "",
       observacoes: "",
       estado_verificacao: "pendente",
-      // edição
       edicao_editora: "",
       edicao_ano: "",
       edicao_numero: "",
@@ -940,7 +871,6 @@ app.get("/obras/nova", (req, res) => {
   });
 });
 
-// Rota: processar criação de obra
 app.post("/obras/nova", async (req, res) => {
   const titulo = String(req.body.titulo || "").trim();
   const titulo_original = String(req.body.titulo_original || "").trim() || null;
@@ -977,7 +907,6 @@ app.post("/obras/nova", async (req, res) => {
     }
   }
 
-  // Autores: uma linha por autor
   const autores = autoresRaw
     .split("\n")
     .map((l) => l.trim())
@@ -1001,7 +930,6 @@ app.post("/obras/nova", async (req, res) => {
     });
   }
 
-  // Se não tem autor, marca a obra como "incompleta"
   let estadoObraFinal = estado_verificacao;
   if (autores.length === 0 && estadoObraFinal === "verificada") {
     estadoObraFinal = "incompleta";
@@ -1064,7 +992,156 @@ app.post("/obras/nova", async (req, res) => {
   }
 });
 
+app.get("/obras/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const or = await pool.query(
+    `SELECT id, titulo, titulo_original, idioma_original, tipo_material,
+            observacoes, estado_verificacao, criado_em, atualizado_em
+       FROM obras WHERE id = $1`,
+    [id]
+  );
+  if (or.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Obra não encontrada.");
+  }
+  const obra = or.rows[0];
+
+  const autoresR = await pool.query(
+    "SELECT nome, ordem FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
+    [id]
+  );
+
+  const edicoesR = await pool.query(
+    `SELECT id, editora, ano, numero_edicao, traducao, idioma, isbn,
+            link_referencia, observacoes, estado_verificacao,
+            criado_em, atualizado_em
+       FROM edicoes
+      WHERE obra_id = $1
+      ORDER BY ano NULLS LAST, id`,
+    [id]
+  );
+
+  const usosR = await pool.query(
+    `SELECT u.id, u.papel, u.modalidade, u.orientacao, u.observacoes,
+            u.estado_revisao, u.criado_em, u.atualizado_em,
+            a.id AS aula_id, a.titulo AS aula_titulo, a.codigo AS aula_codigo,
+            e.id AS edicao_id, e.editora AS edicao_editora, e.ano AS edicao_ano
+       FROM usos u
+       JOIN unidades a ON a.id = u.aula_id
+       LEFT JOIN edicoes e ON e.id = u.edicao_id
+      WHERE u.obra_id = $1
+      ORDER BY a.titulo`,
+    [id]
+  );
+
+  const usosIds = usosR.rows.map((u) => u.id);
+  let recortesPorUso = {};
+  if (usosIds.length > 0) {
+    const rr = await pool.query(
+      `SELECT id, uso_id, rotulo, tipo, inicio, fim, observacao, ordem
+         FROM usos_recortes
+        WHERE uso_id = ANY($1::bigint[])
+        ORDER BY uso_id, ordem, id`,
+      [usosIds]
+    );
+    for (const r of rr.rows) {
+      if (!recortesPorUso[r.uso_id]) recortesPorUso[r.uso_id] = [];
+      recortesPorUso[r.uso_id].push(r);
+    }
+  }
+
+  obra.rotuloTipoMaterial = ROTULO_TIPO_MATERIAL[obra.tipo_material] || obra.tipo_material;
+  obra.rotuloEstadoVerificacao =
+    ROTULO_ESTADO_VERIFICACAO[obra.estado_verificacao] || obra.estado_verificacao;
+
+  const edicoes = edicoesR.rows.map((e) => ({
+    ...e,
+    rotuloEstadoVerificacao:
+      ROTULO_ESTADO_VERIFICACAO[e.estado_verificacao] || e.estado_verificacao
+  }));
+
+  const usos = usosR.rows.map((u) => ({
+    ...u,
+    recortes: recortesPorUso[u.id] || []
+  }));
+
+  res.render("obra-detalhe", {
+    titulo: obra.titulo,
+    obra,
+    autores: autoresR.rows,
+    edicoes,
+    usos
+  });
+});
+
 // ----- Fim das rotas de bibliografia -----
+
+app.get("/unidades/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id, tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora FROM unidades WHERE id = $1",
+    [id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Unidade não encontrada.");
+  }
+  const unidade = r.rows[0];
+
+  const filhosR = await pool.query(
+    "SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 ORDER BY ordem, id",
+    [id]
+  );
+
+  const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
+  const proximo = PROXIMO_NIVEL[unidade.tipo];
+
+  let ficha = null;
+  if (unidade.tipo === "aula") {
+    const fr = await pool.query(
+      `SELECT id, conteudo_markdown, estado_texto, estado_bibliografia,
+              versao_atual, criado_em, atualizado_em
+         FROM fichas
+        WHERE aula_id = $1`,
+      [id]
+    );
+    if (fr.rows.length > 0) {
+      const f = fr.rows[0];
+      ficha = {
+        ...f,
+        conteudo_html: f.conteudo_markdown.trim()
+          ? marked.parse(f.conteudo_markdown)
+          : null,
+        rotuloEstadoTexto: ROTULO_ESTADO_TEXTO[f.estado_texto],
+        rotuloEstadoBibliografia: ROTULO_ESTADO_BIBLIOGRAFIA[f.estado_bibliografia]
+      };
+    }
+  }
+
+  const salvo = req.query.salvo === "1";
+  const nadaMudou = req.query.salvo === "0";
+
+  res.render("unidade-detalhe", {
+    titulo: unidade.titulo,
+    unidade,
+    filhos: filhosR.rows,
+    cadeia,
+    rotuloTipo: ROTULO_TIPO[unidade.tipo],
+    proximoNivel: proximo,
+    rotuloProximo: proximo ? ROTULO_TIPO[proximo] : null,
+    rotuloNovoProximo: proximo ? ROTULO_NOVO[proximo] : null,
+    nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo],
+    ficha,
+    salvo,
+    nadaMudou
+  });
+});
 
 app.get("/health", async (req, res) => {
   try {
