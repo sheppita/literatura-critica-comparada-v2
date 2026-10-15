@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <p class="caminho">
+    <a href="/">Início</a> › Bibliografia
+  </p>
+
+  <h1>Bibliografia</h1>
+  <p class="subtitulo">Catálogo de obras</p>
+
+  <% if (obras.length === 0) { %>
+    <p class="aviso-vazio">
+      Nenhuma obra cadastrada ainda.
+    </p>
+  <% } else { %>
+    <table class="tabela-versoes">
+      <thead>
+        <tr>
+          <th>Título</th>
+          <th>Autoria</th>
+          <th>Tipo</th>
+          <th>Edições</th>
+          <th>Usos</th>
+          <th>Verificação</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const o of obras) { %>
+          <tr>
+            <td><strong><%= o.titulo %></strong></td>
+            <td><%= o.autores || '—' %></td>
+            <td><%= o.rotuloTipoMaterial %></td>
+            <td><%= o.total_edicoes %></td>
+            <td><%= o.total_usos %></td>
+            <td><%= o.rotuloEstadoVerificacao %></td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  <% } %>
+
+  <p style="margin-top: 2rem;">
+    <a href="/obras/nova" class="botao-ghost">+ Nova Obra</a>
+  </p>
+
+  <footer>
+    <a href="/health">/health</a>
+  </footer>
+</body>
+</html>

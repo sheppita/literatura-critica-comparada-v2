@@ -821,6 +821,209 @@ app.get("/unidades/:id", async (req, res) => {
   });
 });
 
+// ----- Rotas de bibliografia -----
+
+const ROTULO_TIPO_MATERIAL = {
+  livro: "Livro",
+  ensaio: "Ensaio",
+  capitulo_coletanea: "Capítulo de Coletânea",
+  outro: "Outro"
+};
+
+const ROTULO_ESTADO_VERIFICACAO = {
+  pendente: "Pendente",
+  verificada: "Verificada",
+  incompleta: "Incompleta"
+};
+
+// Rota: catálogo de obras
+app.get("/obras", async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT o.id, o.titulo, o.tipo_material, o.estado_verificacao,
+              COALESCE(
+                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                   FROM obras_autores oa WHERE oa.obra_id = o.id),
+                ''
+              ) AS autores,
+              (SELECT COUNT(*) FROM edicoes e WHERE e.obra_id = o.id) AS total_edicoes,
+              (SELECT COUNT(*) FROM usos u WHERE u.obra_id = o.id) AS total_usos
+         FROM obras o
+        ORDER BY o.titulo`
+    );
+
+    const obras = r.rows.map((o) => ({
+      ...o,
+      rotuloTipoMaterial: ROTULO_TIPO_MATERIAL[o.tipo_material] || o.tipo_material,
+      rotuloEstadoVerificacao: ROTULO_ESTADO_VERIFICACAO[o.estado_verificacao] || o.estado_verificacao
+    }));
+
+    res.render("obras-lista", {
+      titulo: "Bibliografia",
+      obras
+    });
+  } catch (err) {
+    console.error("Erro na lista de obras:", err.message);
+    res.status(500).type("text/plain").send("Erro ao carregar a lista de obras.");
+  }
+});
+
+// Rota: formulário de nova obra
+app.get("/obras/nova", (req, res) => {
+  res.render("obra-form", {
+    titulo: "Nova Obra",
+    valores: {
+      titulo: "",
+      titulo_original: "",
+      idioma_original: "",
+      tipo_material: "livro",
+      autores: "",
+      observacoes: "",
+      estado_verificacao: "pendente",
+      // edição
+      edicao_editora: "",
+      edicao_ano: "",
+      edicao_numero: "",
+      edicao_traducao: "",
+      edicao_idioma: "",
+      edicao_isbn: "",
+      edicao_link: "",
+      edicao_observacoes: "",
+      edicao_estado: "pendente",
+      incluir_edicao: false
+    },
+    erros: [],
+    tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
+    estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+  });
+});
+
+// Rota: processar criação de obra
+app.post("/obras/nova", async (req, res) => {
+  const titulo = String(req.body.titulo || "").trim();
+  const titulo_original = String(req.body.titulo_original || "").trim() || null;
+  const idioma_original = String(req.body.idioma_original || "").trim() || null;
+  const tipo_material = String(req.body.tipo_material || "livro").trim();
+  const autoresRaw = String(req.body.autores || "").trim();
+  const observacoes = String(req.body.observacoes || "").trim() || null;
+  const estado_verificacao = String(req.body.estado_verificacao || "pendente").trim();
+
+  const incluir_edicao = String(req.body.incluir_edicao || "") === "1";
+  const edicao_editora = String(req.body.edicao_editora || "").trim() || null;
+  const edicao_anoRaw = String(req.body.edicao_ano || "").trim();
+  const edicao_numero = String(req.body.edicao_numero || "").trim() || null;
+  const edicao_traducao = String(req.body.edicao_traducao || "").trim() || null;
+  const edicao_idioma = String(req.body.edicao_idioma || "").trim() || null;
+  const edicao_isbn = String(req.body.edicao_isbn || "").trim() || null;
+  const edicao_link = String(req.body.edicao_link || "").trim() || null;
+  const edicao_observacoes = String(req.body.edicao_observacoes || "").trim() || null;
+  const edicao_estado = String(req.body.edicao_estado || "pendente").trim();
+
+  const erros = [];
+  if (!titulo) erros.push("O título da obra é obrigatório.");
+  if (!ROTULO_TIPO_MATERIAL[tipo_material]) erros.push("Tipo de material inválido.");
+  if (!ROTULO_ESTADO_VERIFICACAO[estado_verificacao]) erros.push("Estado de verificação da obra inválido.");
+  if (!ROTULO_ESTADO_VERIFICACAO[edicao_estado]) erros.push("Estado de verificação da edição inválido.");
+
+  let edicao_ano = null;
+  if (edicao_anoRaw) {
+    const n = Number(edicao_anoRaw);
+    if (!Number.isInteger(n) || n < 1000 || n > 2100) {
+      erros.push("Ano da edição inválido (use um número entre 1000 e 2100).");
+    } else {
+      edicao_ano = n;
+    }
+  }
+
+  // Autores: uma linha por autor
+  const autores = autoresRaw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  if (erros.length > 0) {
+    return res.status(400).render("obra-form", {
+      titulo: "Nova Obra",
+      valores: {
+        titulo, titulo_original: titulo_original || "", idioma_original: idioma_original || "",
+        tipo_material, autores: autoresRaw, observacoes: observacoes || "", estado_verificacao,
+        edicao_editora: edicao_editora || "", edicao_ano: edicao_anoRaw, edicao_numero: edicao_numero || "",
+        edicao_traducao: edicao_traducao || "", edicao_idioma: edicao_idioma || "",
+        edicao_isbn: edicao_isbn || "", edicao_link: edicao_link || "",
+        edicao_observacoes: edicao_observacoes || "", edicao_estado,
+        incluir_edicao
+      },
+      erros,
+      tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
+      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+    });
+  }
+
+  // Se não tem autor, marca a obra como "incompleta"
+  let estadoObraFinal = estado_verificacao;
+  if (autores.length === 0 && estadoObraFinal === "verificada") {
+    estadoObraFinal = "incompleta";
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const obraR = await client.query(
+      `INSERT INTO obras
+         (titulo, titulo_original, idioma_original, tipo_material,
+          observacoes, estado_verificacao)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id`,
+      [titulo, titulo_original, idioma_original, tipo_material, observacoes, estadoObraFinal]
+    );
+    const obraId = obraR.rows[0].id;
+
+    for (let i = 0; i < autores.length; i++) {
+      await client.query(
+        "INSERT INTO obras_autores (obra_id, nome, ordem) VALUES ($1, $2, $3)",
+        [obraId, autores[i], i + 1]
+      );
+    }
+
+    if (incluir_edicao) {
+      await client.query(
+        `INSERT INTO edicoes
+           (obra_id, editora, ano, numero_edicao, traducao, idioma, isbn,
+            link_referencia, observacoes, estado_verificacao)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [obraId, edicao_editora, edicao_ano, edicao_numero, edicao_traducao,
+         edicao_idioma, edicao_isbn, edicao_link, edicao_observacoes, edicao_estado]
+      );
+    }
+
+    await client.query("COMMIT");
+    res.redirect("/obras");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao criar obra:", err.message);
+    return res.status(500).render("obra-form", {
+      titulo: "Nova Obra",
+      valores: {
+        titulo, titulo_original: titulo_original || "", idioma_original: idioma_original || "",
+        tipo_material, autores: autoresRaw, observacoes: observacoes || "", estado_verificacao,
+        edicao_editora: edicao_editora || "", edicao_ano: edicao_anoRaw, edicao_numero: edicao_numero || "",
+        edicao_traducao: edicao_traducao || "", edicao_idioma: edicao_idioma || "",
+        edicao_isbn: edicao_isbn || "", edicao_link: edicao_link || "",
+        edicao_observacoes: edicao_observacoes || "", edicao_estado,
+        incluir_edicao
+      },
+      erros: ["Erro interno ao salvar. Nada foi gravado."],
+      tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
+      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ----- Fim das rotas de bibliografia -----
+
 app.get("/health", async (req, res) => {
   try {
     const r = await pool.query("SELECT COUNT(*)::int AS total FROM unidades");
