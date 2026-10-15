@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= unidade.titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
@@ -26,12 +27,12 @@
 
   <% if (unidade.tipo === 'tema' && unidade.pergunta_norteadora) { %>
     <div class="aviso-vazio">
-      <strong>Pergunta norteadora:</strong> <%= unidade.pergunta_norteadora %>
+      <strong>Pergunta Norteadora:</strong> <%= unidade.pergunta_norteadora %>
     </div>
   <% } %>
 
   <% if (nomeFilhoPlural) { %>
-    <h2 style="font-size: 1.1rem; color: var(--marrom); margin-top: 2rem;">
+    <h2>
       <%= nomeFilhoPlural.charAt(0).toUpperCase() + nomeFilhoPlural.slice(1) %>
     </h2>
 
@@ -51,17 +52,16 @@
     <% } %>
 
     <p style="margin-top: 1.5rem;">
-      <a href="/unidades/nova?tipo=<%= proximoNivel %>&superior_id=<%= unidade.id %>"
-         style="color: var(--terracota);">
-        + Nova <%= rotuloProximo %>
+      <a href="/unidades/nova?tipo=<%= proximoNivel %>&superior_id=<%= unidade.id %>">
+        + <%= rotuloNovoProximo %>
       </a>
     </p>
   <% } %>
 
   <p style="margin-top: 2rem;">
-    <a href="/unidades/<%= unidade.id %>/editar" style="color: var(--terracota);">Editar</a>
+    <a href="/unidades/<%= unidade.id %>/editar">Editar</a>
     ·
-    <a href="/unidades/<%= unidade.id %>/excluir" style="color: var(--terracota);">Excluir</a>
+    <a href="/unidades/<%= unidade.id %>/excluir">Excluir</a>
   </p>
 
   <footer>

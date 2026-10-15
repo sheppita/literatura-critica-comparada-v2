@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
@@ -42,14 +43,14 @@
       </ul>
       Remova ou mova esses itens antes de excluir.
     </div>
-    <p><a href="/unidades/<%= unidade.id %>" style="color: var(--terracota);">Voltar</a></p>
+    <p><a href="/unidades/<%= unidade.id %>">Voltar</a></p>
   <% } else { %>
     <p>Esta ação não pode ser desfeita.</p>
 
     <form method="POST" action="/unidades/<%= unidade.id %>/excluir">
       <div class="acoes">
-        <button type="submit" style="background: #8f4528;">Excluir definitivamente</button>
-        <a class="caminho cancelar" href="/unidades/<%= unidade.id %>">Cancelar</a>
+        <button type="submit" class="perigo">Excluir Definitivamente</button>
+        <a class="botao-ghost" href="/unidades/<%= unidade.id %>">Cancelar</a>
       </div>
     </form>
   <% } %>

@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
@@ -12,7 +13,7 @@
     <% if (superior) { %>
       › <a href="/unidades/<%= superior.id %>"><%= superior.titulo %></a>
     <% } %>
-    › <%= modo === 'editar' ? 'Editar' : (rotuloTipo + ' nova') %>
+    › <%= modo === 'editar' ? 'Editar' : rotuloNovo %>
   </p>
   <h1><%= titulo %></h1>
 
@@ -46,16 +47,18 @@
     <input type="text" id="titulo" name="titulo"
            value="<%= valores.titulo %>" autofocus>
 
-    <label for="codigo">Código visível <span class="ajuda">(opcional)</span></label>
+    <label for="codigo">Código Visível <span class="ajuda">(opcional)</span></label>
     <input type="text" id="codigo" name="codigo"
            value="<%= valores.codigo %>">
 
-    <label for="descricao">Descrição <span class="ajuda">(opcional)</span></label>
-    <textarea id="descricao" name="descricao"><%= valores.descricao %></textarea>
+    <% if (aceitaDescricao) { %>
+      <label for="descricao">Descrição <span class="ajuda">(opcional)</span></label>
+      <textarea id="descricao" name="descricao"><%= valores.descricao %></textarea>
+    <% } %>
 
     <% if (tipo === 'tema') { %>
       <label for="pergunta_norteadora">
-        Pergunta norteadora
+        Pergunta Norteadora
         <span class="ajuda">(opcional nesta etapa)</span>
       </label>
       <textarea id="pergunta_norteadora" name="pergunta_norteadora"><%= valores.pergunta_norteadora %></textarea>
@@ -63,7 +66,7 @@
 
     <div class="acoes">
       <button type="submit">Salvar</button>
-      <a class="caminho cancelar" href="<%= cancelarUrl %>">Cancelar</a>
+      <a class="botao-ghost" href="<%= cancelarUrl %>">Cancelar</a>
     </div>
   </form>
 

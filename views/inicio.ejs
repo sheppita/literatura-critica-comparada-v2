@@ -4,9 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
+  <img class="banner" src="/banner.jpg" alt="">
+
   <h1><a href="/"><%= titulo %></a></h1>
   <% if (typeof subtitulo !== 'undefined' && subtitulo) { %>
     <p class="subtitulo"><%= subtitulo %></p>
@@ -29,7 +32,7 @@
   <% } %>
 
   <p style="margin-top: 2rem;">
-    <a href="/unidades/nova" style="color: var(--terracota);">+ Novo eixo</a>
+    <a href="/unidades/nova">+ Novo Eixo</a>
   </p>
 
   <footer>

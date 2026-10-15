@@ -31,6 +31,14 @@ const ROTULO_TIPO = {
   aula: "Aula"
 };
 
+const ROTULO_NOVO = {
+  eixo: "Novo Eixo",
+  disciplina: "Nova Disciplina",
+  modulo: "Novo Módulo",
+  tema: "Novo Tema",
+  aula: "Nova Aula"
+};
+
 const PROXIMO_NIVEL = {
   eixo: "disciplina",
   disciplina: "modulo",
@@ -46,6 +54,12 @@ const NOME_FILHO_PLURAL = {
   tema: "aulas",
   aula: null
 };
+
+const TIPOS_COM_DESCRICAO = ["eixo", "disciplina", "modulo"];
+
+function aceitaDescricao(tipo) {
+  return TIPOS_COM_DESCRICAO.includes(tipo);
+}
 
 async function cadeiaDeSuperiores(id) {
   const cadeia = [];
@@ -99,15 +113,17 @@ app.get("/unidades/nova", async (req, res) => {
   }
 
   res.render("unidade-form", {
-    titulo: `Nova ${ROTULO_TIPO[tipo]}`,
+    titulo: ROTULO_NOVO[tipo],
     tipo,
     rotuloTipo: ROTULO_TIPO[tipo],
+    rotuloNovo: ROTULO_NOVO[tipo],
     superior,
     valores: { titulo: "", codigo: "", descricao: "", pergunta_norteadora: "" },
     erros: [],
     modo: "criar",
     acao: "/unidades/nova",
-    cancelarUrl: superior ? `/unidades/${superior.id}` : "/"
+    cancelarUrl: superior ? `/unidades/${superior.id}` : "/",
+    aceitaDescricao: aceitaDescricao(tipo)
   });
 });
 
@@ -116,13 +132,18 @@ app.post("/unidades/nova", async (req, res) => {
   const superiorId = req.body.superior_id ? Number(req.body.superior_id) : null;
   const titulo = String(req.body.titulo || "").trim();
   const codigo = String(req.body.codigo || "").trim() || null;
-  const descricao = String(req.body.descricao || "").trim() || null;
+  const descricaoRaw = String(req.body.descricao || "").trim() || null;
   const pergunta = String(req.body.pergunta_norteadora || "").trim() || null;
+
+  const descricao = aceitaDescricao(tipo) ? descricaoRaw : null;
 
   const erros = [];
   if (!TIPOS_VALIDOS.includes(tipo)) erros.push("Tipo inválido.");
   if (!titulo) erros.push("O título é obrigatório.");
   if (tipo !== "tema" && pergunta) erros.push("Pergunta norteadora só existe em tema.");
+  if (!aceitaDescricao(tipo) && descricaoRaw) {
+    erros.push("Este nível não aceita descrição.");
+  }
   if (tipo === "eixo" && superiorId) erros.push("Eixo não tem unidade superior.");
 
   let superior = null;
@@ -146,15 +167,17 @@ app.post("/unidades/nova", async (req, res) => {
 
   if (erros.length > 0) {
     return res.status(400).render("unidade-form", {
-      titulo: `Nova ${ROTULO_TIPO[tipo] || "Unidade"}`,
+      titulo: ROTULO_NOVO[tipo] || "Nova Unidade",
       tipo,
       rotuloTipo: ROTULO_TIPO[tipo] || "Unidade",
+      rotuloNovo: ROTULO_NOVO[tipo] || "Nova Unidade",
       superior,
-      valores: { titulo, codigo: codigo || "", descricao: descricao || "", pergunta_norteadora: pergunta || "" },
+      valores: { titulo, codigo: codigo || "", descricao: descricaoRaw || "", pergunta_norteadora: pergunta || "" },
       erros,
       modo: "criar",
       acao: "/unidades/nova",
-      cancelarUrl: superior ? `/unidades/${superior.id}` : "/"
+      cancelarUrl: superior ? `/unidades/${superior.id}` : "/",
+      aceitaDescricao: aceitaDescricao(tipo)
     });
   }
 
@@ -209,6 +232,7 @@ app.get("/unidades/:id/editar", async (req, res) => {
     titulo: `Editar ${ROTULO_TIPO[u.tipo]}`,
     tipo: u.tipo,
     rotuloTipo: ROTULO_TIPO[u.tipo],
+    rotuloNovo: ROTULO_NOVO[u.tipo],
     superior,
     valores: {
       titulo: u.titulo,
@@ -219,7 +243,8 @@ app.get("/unidades/:id/editar", async (req, res) => {
     erros: [],
     modo: "editar",
     acao: `/unidades/${u.id}/editar`,
-    cancelarUrl: `/unidades/${u.id}`
+    cancelarUrl: `/unidades/${u.id}`,
+    aceitaDescricao: aceitaDescricao(u.tipo)
   });
 });
 
@@ -240,13 +265,18 @@ app.post("/unidades/:id/editar", async (req, res) => {
 
   const titulo = String(req.body.titulo || "").trim();
   const codigo = String(req.body.codigo || "").trim() || null;
-  const descricao = String(req.body.descricao || "").trim() || null;
+  const descricaoRaw = String(req.body.descricao || "").trim() || null;
   const pergunta = String(req.body.pergunta_norteadora || "").trim() || null;
+
+  const descricao = aceitaDescricao(atual.tipo) ? descricaoRaw : null;
 
   const erros = [];
   if (!titulo) erros.push("O título é obrigatório.");
   if (atual.tipo !== "tema" && pergunta) {
     erros.push("Pergunta norteadora só existe em tema.");
+  }
+  if (!aceitaDescricao(atual.tipo) && descricaoRaw) {
+    erros.push("Este nível não aceita descrição.");
   }
 
   let superior = null;
@@ -263,12 +293,14 @@ app.post("/unidades/:id/editar", async (req, res) => {
       titulo: `Editar ${ROTULO_TIPO[atual.tipo]}`,
       tipo: atual.tipo,
       rotuloTipo: ROTULO_TIPO[atual.tipo],
+      rotuloNovo: ROTULO_NOVO[atual.tipo],
       superior,
-      valores: { titulo, codigo: codigo || "", descricao: descricao || "", pergunta_norteadora: pergunta || "" },
+      valores: { titulo, codigo: codigo || "", descricao: descricaoRaw || "", pergunta_norteadora: pergunta || "" },
       erros,
       modo: "editar",
       acao: `/unidades/${id}/editar`,
-      cancelarUrl: `/unidades/${id}`
+      cancelarUrl: `/unidades/${id}`,
+      aceitaDescricao: aceitaDescricao(atual.tipo)
     });
   }
 
@@ -286,7 +318,6 @@ app.post("/unidades/:id/editar", async (req, res) => {
   res.redirect(`/unidades/${id}`);
 });
 
-// Rota: tela de confirmação de exclusão
 app.get("/unidades/:id/excluir", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -325,7 +356,6 @@ app.get("/unidades/:id/excluir", async (req, res) => {
   });
 });
 
-// Rota: processar exclusão
 app.post("/unidades/:id/excluir", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -396,6 +426,7 @@ app.get("/unidades/:id", async (req, res) => {
     rotuloTipo: ROTULO_TIPO[unidade.tipo],
     proximoNivel: proximo,
     rotuloProximo: proximo ? ROTULO_TIPO[proximo] : null,
+    rotuloNovoProximo: proximo ? ROTULO_NOVO[proximo] : null,
     nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo]
   });
 });
