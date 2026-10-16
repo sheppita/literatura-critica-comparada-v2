@@ -129,12 +129,8 @@
                   <div class="detalhe-suave">
                     Recortes:
                     <%= u.recortes.map(r => {
-                      if (r.tipo === 'integral') return 'Obra integral';
                       if (r.tipo === 'a_conferir') return 'A conferir';
-                      const inicio = r.inicio || '';
-                      const fim = r.fim || '';
-                      const intervalo = inicio && fim ? `${inicio}–${fim}` : (inicio || fim);
-                      const base = (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
+                      const base = r.rotulo || r.tipo;
                       return r.observacao ? `${base} — ${r.observacao}` : base;
                     }).join(' · ') %>
                   </div>

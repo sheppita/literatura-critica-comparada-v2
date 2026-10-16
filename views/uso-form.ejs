@@ -69,7 +69,7 @@
     </select>
 
     <fieldset class="bloco-recortes">
-      <legend>Recortes <span class="ajuda">(capítulos, páginas, seções)</span></legend>
+      <legend>Recortes <span class="ajuda">(capítulos, seções, ensaios)</span></legend>
       <p class="detalhe-suave">
         Deixe em branco se a obra for integral. Use "A Conferir" se ainda não sabe.
       </p>
@@ -83,8 +83,6 @@
               <% } %>
             </select>
             <input type="text" name="recorte_rotulo[]" placeholder="Rótulo (ex.: Cap. 3)" value="<%= r.rotulo %>">
-            <input type="text" name="recorte_inicio[]" placeholder="Início" value="<%= r.inicio %>">
-            <input type="text" name="recorte_fim[]" placeholder="Fim" value="<%= r.fim %>">
             <input type="text" name="recorte_observacao[]" placeholder="Observação" value="<%= r.observacao %>">
             <button type="button" class="btn-remover-recorte botao-ghost">×</button>
           </div>
@@ -105,6 +103,14 @@
     </div>
   </form>
 
+  <% if (modo === 'editar') { %>
+    <form method="POST" action="/unidades/<%= aula.id %>/usos/<%= valores.uso_id %>/excluir"
+          style="margin-top: 2rem;"
+          onsubmit="return confirm('Excluir este uso? A obra continua no catálogo.');">
+      <button type="submit" class="link-perigo">Excluir Uso</button>
+    </form>
+  <% } %>
+
   <template id="molde-recorte">
     <div class="recorte-linha">
       <select name="recorte_tipo[]">
@@ -113,8 +119,6 @@
         <% } %>
       </select>
       <input type="text" name="recorte_rotulo[]" placeholder="Rótulo (ex.: Cap. 3)">
-      <input type="text" name="recorte_inicio[]" placeholder="Início">
-      <input type="text" name="recorte_fim[]" placeholder="Fim">
       <input type="text" name="recorte_observacao[]" placeholder="Observação">
       <button type="button" class="btn-remover-recorte botao-ghost">×</button>
     </div>

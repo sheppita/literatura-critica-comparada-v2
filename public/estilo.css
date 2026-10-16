@@ -898,3 +898,20 @@ body {
     hyphens: auto;
   }
 }
+
+/* Botão de perigo em formato de link (Excluir Obra, Excluir Uso) */
+.link-perigo {
+  background: transparent;
+  border: none;
+  color: #c0392b;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0;
+  text-decoration: none;
+}
+.link-perigo:hover {
+  color: #8f1e14;
+  text-decoration: underline;
+}

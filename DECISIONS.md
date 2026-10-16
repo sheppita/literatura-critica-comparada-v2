@@ -53,8 +53,8 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D47 | Texto da ficha justificado em telas ≥ 700px, com hifenização automática | consolidada |
 | D48 | Capa da edição por URL (sem upload); exibida em obra, aula e catálogo | consolidada |
 | D49 | No catálogo, capa exibida é a da edição mais recente (por ano) | consolidada |
-| D50 | Formulário de Nova Obra: apenas Título, Autoria, Tipo de material e bloco de Primeira Edição (Editora, Ano, ISBN, Capa) | consolidada |
-| D51 | Formulário de Edição: apenas Editora, Ano, ISBN, Capa | consolidada |
+| D50 | Formulário de Nova Obra: Título, Autoria, Tipo de material e bloco de Primeira Edição (Editora, Ano, Capa) | consolidada |
+| D51 | Formulário de Edição: Editora, Ano, Capa | consolidada |
 | D52 | Formulário de Uso: Estado de revisão e Observações removidos da interface | consolidada |
 | D53 | Bloco de Primeira Edição sempre visível; edição só é criada se ao menos um campo dela for preenchido | consolidada |
 | D54 | Campos removidos da interface continuam existindo no banco (decisão reversível) | consolidada |
@@ -64,6 +64,13 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D58 | Constraint `descricao` só se aplica a eixo e disciplina (não mais módulo). | consolidada |
 | D59 | Botão "+ Aula" removido da navbar. Criação de aula acontece dentro do tema. | consolidada |
 | D60 | Rota `/aulas/nova` e template `aula-nova-escolher-tema.ejs` removidos. | consolidada |
+| D61 | Excluir obra: bloqueia se estiver em uso; exclusão direta se não estiver, com confirmação simples. | consolidada |
+| D62 | Excluir uso: disponível na tela de editar uso, com confirmação simples. | consolidada |
+| D63 | ISBN removido dos formulários e da exibição (coluna mantida no banco, D54). | consolidada |
+| D64 | Tipos de material: `livro`, `artigo`, `ensaio`, `revista`, `outro`. | consolidada |
+| D65 | Tipos de recorte: `capitulo`, `secao`, `ensaio`, `a_conferir`. | consolidada |
+| D66 | Campos "Início" e "Fim" removidos dos formulários de recorte (colunas mantidas no banco, D54). | consolidada |
+| D67 | Recorte `a_conferir` é o único tipo especial que permanece (sinaliza pendência). `integral` foi removido — a modalidade do uso já expressa "obra integral". | consolidada |
 
 ## Regras de trabalho
 
@@ -77,6 +84,7 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 - **R8:** perguntar à usuária antes de dividir arquivo grande em trechos. A decisão de receber inteiro ou em pedaços é dela.
 - **R9:** quando houver dúvida entre manter um campo pela spec e remover pela simplicidade do uso, **o uso manda**. YAGNI reverso: construir, ver e remover é melhor que construir enxuto demais e descobrir depois que faltava.
 - **R10:** ao remover uma camada da hierarquia, os dados dessa camada são **arquivados**, não apagados — reversível até que se decida o contrário.
+- **R11:** mudanças em constraints do banco ou migrações de dados merecem atenção redobrada — ordem de operações (migrar antes de alterar constraint) e verificação pós-migração.
 
 ## Comportamentos conhecidos (não são bugs)
 
@@ -90,3 +98,5 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 - Coluna `arquivada` em `unidades` (adicionada em out/2026).
 - 9 módulos arquivados em `unidades` (`tipo = 'modulo'`, `arquivada = true`).
 - Constraints ativas em `unidades`: `unidades_tipo_check`, `descricao_apenas_em_eixo_disciplina`, `pergunta_norteadora_so_em_tema`.
+- Constraints ativas em `usos_recortes`: `usos_recortes_tipo_check` (`capitulo`, `secao`, `ensaio`, `a_conferir`).
+- Constraints ativas em `obras`: `obras_tipo_material_check` (`livro`, `artigo`, `ensaio`, `revista`, `outro`).

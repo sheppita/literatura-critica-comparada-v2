@@ -41,24 +41,18 @@
     <% } %>
   </p>
 
-  <% if (obra.titulo_original || obra.idioma_original) { %>
-    <p>
-      <% if (obra.titulo_original) { %>
-        <strong>Título original:</strong> <%= obra.titulo_original %><br>
-      <% } %>
-      <% if (obra.idioma_original) { %>
-        <strong>Idioma original:</strong> <%= obra.idioma_original %>
-      <% } %>
-    </p>
-  <% } %>
-
   <% if (obra.observacoes) { %>
     <p><strong>Observações:</strong> <%= obra.observacoes %></p>
   <% } %>
 
-  <p style="margin-top: 1.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+  <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
     <a href="/obras/<%= obra.id %>/editar" class="botao-ghost">Editar Obra</a>
-  </p>
+    <form method="POST" action="/obras/<%= obra.id %>/excluir"
+          style="display:inline;"
+          onsubmit="return confirm('Excluir esta obra? Esta ação não pode ser desfeita. Só é possível excluir obras que não estão em uso.');">
+      <button type="submit" class="link-perigo">Excluir Obra</button>
+    </form>
+  </div>
 
   <%# ===== EDIÇÕES ===== %>
   <hr class="divisor">
@@ -80,9 +74,6 @@
               <div>
                 <strong><%= e.editora || 'Editora não informada' %></strong>
                 <% if (e.ano) { %>, <%= e.ano %><% } %>
-                <% if (e.numero_edicao) { %> · <%= e.numero_edicao %><% } %>
-                <% if (e.traducao) { %> · Trad.: <%= e.traducao %><% } %>
-                <% if (e.idioma) { %> · Idioma: <%= e.idioma %><% } %>
                 <span class="chip chip-suave" style="margin-left: 0.5rem;">
                   <%= e.rotuloEstadoVerificacao %>
                 </span>
@@ -97,19 +88,6 @@
                 </form>
               </div>
             </div>
-            <% if (e.isbn) { %>
-              <div class="detalhe-suave">ISBN: <%= e.isbn %></div>
-            <% } %>
-            <% if (e.link_referencia) { %>
-              <div class="detalhe-suave">
-                <a href="<%= e.link_referencia %>" target="_blank" rel="noopener noreferrer">
-                  <%= e.link_referencia %>
-                </a>
-              </div>
-            <% } %>
-            <% if (e.observacoes) { %>
-              <div class="detalhe-suave"><%= e.observacoes %></div>
-            <% } %>
           </div>
         </li>
       <% } %>
@@ -164,12 +142,8 @@
                 <div class="detalhe-suave">
                   Recortes:
                   <%= u.recortes.map(r => {
-                    if (r.tipo === 'integral') return 'Obra integral';
                     if (r.tipo === 'a_conferir') return 'A conferir';
-                    const inicio = r.inicio || '';
-                    const fim = r.fim || '';
-                    const intervalo = inicio && fim ? `${inicio}–${fim}` : (inicio || fim);
-                    const base = (r.rotulo || r.tipo) + (intervalo ? ` (${intervalo})` : '');
+                    const base = r.rotulo || r.tipo;
                     return r.observacao ? `${base} — ${r.observacao}` : base;
                   }).join(' · ') %>
                 </div>

@@ -2,7 +2,7 @@
 
 ## Fase atual
 
-Pacote 2 de melhorias pós-uso — rodadas R1 a R5.4 + R8 concluídas.
+Pacote 2 de melhorias pós-uso — rodadas R1 a R5.4, R8 e R9 concluídas.
 Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito lado a lado).
 
 ## Concluído
@@ -43,9 +43,15 @@ Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito la
 - **R8** — Remoção do nível "Módulo":
   - R8.1 Diagnóstico + backup
   - R8.2 Migração: 30 temas remanejados para disciplina; 9 módulos arquivados
-  - R8.3 Constraints ajustadas (`unidades_tipo_check`, `descricao_apenas_em_eixo_disciplina`)
-  - R8.4 `server.js` atualizado (PROXIMO_NIVEL, validações, rotas)
-  - R8.5 Botão "+ Aula" removido da navbar; rota `/aulas/nova` e template removidos
+  - R8.3 Constraints ajustadas
+  - R8.4 `server.js` atualizado
+  - R8.5 Botão "+ Aula" removido; rota `/aulas/nova` e template removidos
+- **R9** — Ajustes finos da bibliografia:
+  - #24 Excluir obra (bloqueia se em uso)
+  - #25 Excluir uso na tela de editar uso
+  - #26 ISBN removido dos formulários e da exibição
+  - #27 Tipos de material: Livro, Artigo, Ensaio, Revista, Outro
+  - #28 Recortes simplificados: sem início/fim; tipos Capítulo, Seção, Ensaio, A Conferir
 
 ## Em andamento
 
@@ -66,9 +72,8 @@ Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito la
 
 ## Onde paramos
 
-Hierarquia curricular simplificada para Eixo → Disciplina → Tema → Aula.
-30 temas remanejados, 9 módulos arquivados no banco. Sistema funcional,
-com os três pilares (estrutura, fichas, bibliografia) estáveis.
+Hierarquia curricular simplificada (Eixo → Disciplina → Tema → Aula).
+Bibliografia ajustada com tipos de material e recortes coerentes com o uso real.
 Próxima rodada: R6.
 
 ## Registros de incidentes
