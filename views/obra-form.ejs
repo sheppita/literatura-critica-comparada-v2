@@ -33,19 +33,11 @@
   <% } %>
 
   <form method="POST" action="<%= acao %>">
-    <h2>Obra</h2>
-
     <label for="titulo">Título <span class="ajuda">(obrigatório)</span></label>
     <input type="text" id="titulo" name="titulo" value="<%= valores.titulo %>" autofocus>
 
-    <label for="autores">Autoria <span class="ajuda">(um autor por linha; opcional, mas recomendado)</span></label>
+    <label for="autores">Autoria <span class="ajuda">(um autor por linha)</span></label>
     <textarea id="autores" name="autores" rows="3"><%= valores.autores %></textarea>
-
-    <label for="titulo_original">Título original <span class="ajuda">(opcional)</span></label>
-    <input type="text" id="titulo_original" name="titulo_original" value="<%= valores.titulo_original %>">
-
-    <label for="idioma_original">Idioma original <span class="ajuda">(opcional)</span></label>
-    <input type="text" id="idioma_original" name="idioma_original" value="<%= valores.idioma_original %>">
 
     <label for="tipo_material">Tipo de material</label>
     <select id="tipo_material" name="tipo_material">
@@ -56,66 +48,22 @@
       <% } %>
     </select>
 
-    <label for="observacoes">Observações <span class="ajuda">(opcional)</span></label>
-    <textarea id="observacoes" name="observacoes"><%= valores.observacoes %></textarea>
-
-    <label for="estado_verificacao">Estado de verificação</label>
-    <select id="estado_verificacao" name="estado_verificacao">
-      <% for (const [valor, rotulo] of estadosVerificacao) { %>
-        <option value="<%= valor %>" <%= valores.estado_verificacao === valor ? 'selected' : '' %>>
-          <%= rotulo %>
-        </option>
-      <% } %>
-    </select>
-
     <% if (modo === 'criar') { %>
       <hr class="divisor">
-      <h2>Primeira Edição <span class="ajuda">(opcional agora; pode cadastrar depois)</span></h2>
+      <h2>Primeira Edição <span class="ajuda">(opcional; preencha o que souber)</span></h2>
 
-      <label class="checkbox-linha">
-        <input type="checkbox" name="incluir_edicao" value="1" id="incluir_edicao"
-               <%= valores.incluir_edicao ? 'checked' : '' %>>
-        Incluir dados da edição agora
-      </label>
+      <label for="edicao_editora">Editora</label>
+      <input type="text" id="edicao_editora" name="edicao_editora" value="<%= valores.edicao_editora %>">
 
-      <div id="bloco-edicao" style="<%= valores.incluir_edicao ? '' : 'display:none;' %>">
-        <label for="edicao_editora">Editora</label>
-        <input type="text" id="edicao_editora" name="edicao_editora" value="<%= valores.edicao_editora %>">
+      <label for="edicao_ano">Ano</label>
+      <input type="text" id="edicao_ano" name="edicao_ano" value="<%= valores.edicao_ano %>">
 
-        <label for="edicao_ano">Ano</label>
-        <input type="text" id="edicao_ano" name="edicao_ano" value="<%= valores.edicao_ano %>">
+      <label for="edicao_isbn">ISBN</label>
+      <input type="text" id="edicao_isbn" name="edicao_isbn" value="<%= valores.edicao_isbn %>">
 
-        <label for="edicao_numero">Número/identificação da edição</label>
-        <input type="text" id="edicao_numero" name="edicao_numero" value="<%= valores.edicao_numero %>">
-
-        <label for="edicao_traducao">Tradução</label>
-        <input type="text" id="edicao_traducao" name="edicao_traducao" value="<%= valores.edicao_traducao %>">
-
-        <label for="edicao_idioma">Idioma desta edição</label>
-        <input type="text" id="edicao_idioma" name="edicao_idioma" value="<%= valores.edicao_idioma %>">
-
-        <label for="edicao_isbn">ISBN</label>
-        <input type="text" id="edicao_isbn" name="edicao_isbn" value="<%= valores.edicao_isbn %>">
-
-        <label for="edicao_link">Link de referência</label>
-        <input type="text" id="edicao_link" name="edicao_link" value="<%= valores.edicao_link %>">
-
-        <label for="edicao_capa_url">URL da capa <span class="ajuda">(opcional; link direto para uma imagem)</span></label>
-        <input type="text" id="edicao_capa_url" name="edicao_capa_url" value="<%= valores.edicao_capa_url %>"
-               placeholder="https://...">
-
-        <label for="edicao_observacoes">Observações da edição</label>
-        <textarea id="edicao_observacoes" name="edicao_observacoes"><%= valores.edicao_observacoes %></textarea>
-
-        <label for="edicao_estado">Estado de verificação da edição</label>
-        <select id="edicao_estado" name="edicao_estado">
-          <% for (const [valor, rotulo] of estadosVerificacao) { %>
-            <option value="<%= valor %>" <%= valores.edicao_estado === valor ? 'selected' : '' %>>
-              <%= rotulo %>
-            </option>
-          <% } %>
-        </select>
-      </div>
+      <label for="edicao_capa_url">URL da capa <span class="ajuda">(opcional; link direto para uma imagem)</span></label>
+      <input type="text" id="edicao_capa_url" name="edicao_capa_url" value="<%= valores.edicao_capa_url %>"
+             placeholder="https://...">
     <% } %>
 
     <div class="acoes">
@@ -125,19 +73,5 @@
   </form>
 
   <%- include('./partials/botoes-flutuantes') %>
-
-  <% if (modo === 'criar') { %>
-    <script>
-      (function () {
-        const cb = document.getElementById("incluir_edicao");
-        const bloco = document.getElementById("bloco-edicao");
-        if (cb) {
-          cb.addEventListener("change", () => {
-            bloco.style.display = cb.checked ? "block" : "none";
-          });
-        }
-      })();
-    </script>
-  <% } %>
 </body>
 </html>

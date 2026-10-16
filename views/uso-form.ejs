@@ -8,7 +8,8 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
-<%- include('./partials/navbar') %>
+  <%- include('./partials/navbar') %>
+
   <p class="caminho">
     <a href="/">Início</a>
     <% for (const u of cadeia) { %>
@@ -48,7 +49,7 @@
       <option value="">— Edição não especificada —</option>
       <% for (const e of edicoes) { %>
         <option value="<%= e.id %>" <%= valores.edicao_id === String(e.id) ? 'selected' : '' %>>
-          <%= e.editora || '—' %><% if (e.ano) { %>, <%= e.ano %><% } %><% if (e.numero_edicao) { %> (<%= e.numero_edicao %>)<% } %>
+          <%= e.editora || '—' %><% if (e.ano) { %>, <%= e.ano %><% } %>
         </option>
       <% } %>
     </select>
@@ -64,13 +65,6 @@
     <select id="modalidade" name="modalidade">
       <% for (const [valor, rotulo] of modalidades) { %>
         <option value="<%= valor %>" <%= valores.modalidade === valor ? 'selected' : '' %>><%= rotulo %></option>
-      <% } %>
-    </select>
-
-    <label for="estado_revisao">Estado de revisão</label>
-    <select id="estado_revisao" name="estado_revisao">
-      <% for (const [valor, rotulo] of estadosRevisao) { %>
-        <option value="<%= valor %>" <%= valores.estado_revisao === valor ? 'selected' : '' %>><%= rotulo %></option>
       <% } %>
     </select>
 
@@ -105,9 +99,6 @@
     <label for="orientacao">Orientação / justificativa <span class="ajuda">(opcional)</span></label>
     <textarea id="orientacao" name="orientacao"><%= valores.orientacao %></textarea>
 
-    <label for="observacoes">Observações <span class="ajuda">(opcional)</span></label>
-    <textarea id="observacoes" name="observacoes"><%= valores.observacoes %></textarea>
-
     <div class="acoes">
       <button type="submit">Salvar</button>
       <a class="botao-ghost" href="<%= cancelarUrl %>">Cancelar</a>
@@ -129,9 +120,7 @@
     </div>
   </template>
 
-  <footer>
-    <a href="/health">/health</a>
-  </footer>
+  <%- include('./partials/botoes-flutuantes') %>
 
   <script>
     (function () {
@@ -140,9 +129,6 @@
       const listaRecortes = document.getElementById("lista-recortes");
       const btnAdd = document.getElementById("btn-add-recorte");
       const molde = document.getElementById("molde-recorte");
-
-      // Guarda a edição pré-selecionada no carregamento inicial (caso venha do banco)
-      const edicaoInicial = selectEdicao.value;
 
       async function carregarEdicoes(preservarSelecao) {
         const obraId = selectObra.value;
@@ -157,7 +143,6 @@
             opt.value = e.id;
             let rotulo = e.editora || "—";
             if (e.ano) rotulo += ", " + e.ano;
-            if (e.numero_edicao) rotulo += " (" + e.numero_edicao + ")";
             opt.textContent = rotulo;
             if (selecaoAtual && String(e.id) === String(selecaoAtual)) {
               opt.selected = true;
@@ -169,8 +154,6 @@
         }
       }
 
-      // No carregamento inicial, se a obra já tem edição selecionada (modo editar),
-      // recarrega as edições mas preserva a seleção.
       if (selectObra.value) {
         carregarEdicoes(true);
       }
@@ -192,6 +175,5 @@
       });
     })();
   </script>
-<%- include('./partials/botoes-flutuantes') %>
 </body>
 </html>

@@ -2,8 +2,8 @@
 
 ## Fase atual
 
-Pacote 2 de melhorias pós-uso — rodadas R1 a R5 concluídas.
-Próxima rodada: R6 (autocomplete e melhorias estruturais).
+Pacote 2 de melhorias pós-uso — rodadas R1 a R5.4 concluídas.
+Próxima rodada: R6 (autocomplete no servidor, comparação de recortes).
 
 ## Concluído
 
@@ -51,6 +51,9 @@ Próxima rodada: R6 (autocomplete e melhorias estruturais).
   quando o código começa com ele; "+ Nova Obra" no topo do catálogo.
 - **R5.3** — Campo "URL da capa" em edições; exibição da capa em obra, aula
   e catálogo; texto da ficha justificado em telas largas.
+- **R5.4** — Bug #4 (capa_url em Nova Obra); Bug #5 (comparação de tipos em uso);
+  Bug #6 (aviso "Sair do site?" disparando ao salvar ficha); simplificação dos
+  formulários de Obra, Edição e Uso.
 
 ## Em andamento
 
@@ -58,24 +61,24 @@ Próxima rodada: R6 (autocomplete e melhorias estruturais).
 
 ## Próximo
 
-- R6 — Autocomplete no servidor para selects grandes (obras, autores, etc.);
-  comparação de recortes entre usos; deixar claro que o formulário permite
-  múltiplos recortes.
-- R7 — Tela de comparação lado a lado em conflito de versão.
+- **R6** — Autocomplete no servidor para selects grandes (obras, autores);
+  visão comparativa de recortes entre usos; deixar claro que o formulário
+  permite múltiplos recortes.
+- **R7** — Tela de comparação lado a lado em conflito de versão.
 
-## Pendências anotadas para rodadas futuras do Pacote 2
+## Pendências anotadas
 
 - **Item #6** — Editor de ficha lento e com atritos (relato genérico).
   Aguardando anotações específicas antes de atacar.
-- **Item #14** — Linha "tipo · código" redundante (resolvido em R5.2).
-- **Item #11** — Visão comparativa de recortes entre usos (R6).
-- **Item #12** — Deixar claro que o formulário permite múltiplos recortes (R6).
+- **Tela de decisões de revisão** — mantida (uso futuro previsto).
+- **Estados da ficha** — em observação pela usuária.
 
 ## Onde paramos
 
 Sistema tem os três pilares funcionais (estrutura, fichas, bibliografia),
 com identidade visual aplicada, navegação fixa, capas, ordenação, e as
-principais correções de robustez do Pacote 2. Próxima rodada: R6.
+principais correções de robustez e simplificações do Pacote 2.
+Próxima rodada: R6.
 
 ## Registros de incidentes
 

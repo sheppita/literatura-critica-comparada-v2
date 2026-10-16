@@ -1095,7 +1095,7 @@ app.get("/obras/nova", (req, res) => {
       edicao_capa_url: "",
       edicao_observacoes: "",
       edicao_estado: "pendente",
-      incluir_edicao: false
+      incluir_edicao: true
     },
     erros: [],
     tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
@@ -1105,30 +1105,17 @@ app.get("/obras/nova", (req, res) => {
 
 app.post("/obras/nova", async (req, res) => {
   const titulo = String(req.body.titulo || "").trim();
-  const titulo_original = String(req.body.titulo_original || "").trim() || null;
-  const idioma_original = String(req.body.idioma_original || "").trim() || null;
   const tipo_material = String(req.body.tipo_material || "livro").trim();
   const autoresRaw = String(req.body.autores || "").trim();
-  const observacoes = String(req.body.observacoes || "").trim() || null;
-  const estado_verificacao = String(req.body.estado_verificacao || "pendente").trim();
 
-  const incluir_edicao = String(req.body.incluir_edicao || "") === "1";
   const edicao_editora = String(req.body.edicao_editora || "").trim() || null;
   const edicao_anoRaw = String(req.body.edicao_ano || "").trim();
-  const edicao_numero = String(req.body.edicao_numero || "").trim() || null;
-  const edicao_traducao = String(req.body.edicao_traducao || "").trim() || null;
-  const edicao_idioma = String(req.body.edicao_idioma || "").trim() || null;
   const edicao_isbn = String(req.body.edicao_isbn || "").trim() || null;
-  const edicao_link = String(req.body.edicao_link || "").trim() || null;
   const edicao_capa_url = String(req.body.edicao_capa_url || "").trim() || null;
-  const edicao_observacoes = String(req.body.edicao_observacoes || "").trim() || null;
-  const edicao_estado = String(req.body.edicao_estado || "pendente").trim();
 
   const erros = [];
   if (!titulo) erros.push("O título da obra é obrigatório.");
   if (!ROTULO_TIPO_MATERIAL[tipo_material]) erros.push("Tipo de material inválido.");
-  if (!ROTULO_ESTADO_VERIFICACAO[estado_verificacao]) erros.push("Estado de verificação da obra inválido.");
-  if (!ROTULO_ESTADO_VERIFICACAO[edicao_estado]) erros.push("Estado de verificação da edição inválido.");
 
   let edicao_ano = null;
   if (edicao_anoRaw) {
@@ -1145,6 +1132,9 @@ app.post("/obras/nova", async (req, res) => {
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
+  // Só cria edição se pelo menos um campo dela foi preenchido
+  const temDadosEdicao = Boolean(edicao_editora || edicao_ano || edicao_isbn || edicao_capa_url);
+
   if (erros.length > 0) {
     return res.status(400).render("obra-form", {
       titulo: "Nova Obra",
@@ -1153,14 +1143,13 @@ app.post("/obras/nova", async (req, res) => {
       cancelarUrl: "/obras",
       obraId: null,
       valores: {
-        titulo, titulo_original: titulo_original || "", idioma_original: idioma_original || "",
-        tipo_material, autores: autoresRaw, observacoes: observacoes || "", estado_verificacao,
-        edicao_editora: edicao_editora || "", edicao_ano: edicao_anoRaw, edicao_numero: edicao_numero || "",
-        edicao_traducao: edicao_traducao || "", edicao_idioma: edicao_idioma || "",
-        edicao_isbn: edicao_isbn || "", edicao_link: edicao_link || "",
-        edicao_capa_url: edicao_capa_url || "",
-        edicao_observacoes: edicao_observacoes || "", edicao_estado,
-        incluir_edicao
+        titulo,
+        tipo_material,
+        autores: autoresRaw,
+        edicao_editora: edicao_editora || "",
+        edicao_ano: edicao_anoRaw,
+        edicao_isbn: edicao_isbn || "",
+        edicao_capa_url: edicao_capa_url || ""
       },
       erros,
       tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
@@ -1168,10 +1157,8 @@ app.post("/obras/nova", async (req, res) => {
     });
   }
 
-  let estadoObraFinal = estado_verificacao;
-  if (autores.length === 0 && estadoObraFinal === "verificada") {
-    estadoObraFinal = "incompleta";
-  }
+  // Estado da obra: incompleta se não tem autor, senão pendente
+  const estadoObraFinal = autores.length === 0 ? "incompleta" : "pendente";
 
   const client = await pool.connect();
   try {
@@ -1179,11 +1166,10 @@ app.post("/obras/nova", async (req, res) => {
 
     const obraR = await client.query(
       `INSERT INTO obras
-         (titulo, titulo_original, idioma_original, tipo_material,
-          observacoes, estado_verificacao)
-       VALUES ($1, $2, $3, $4, $5, $6)
+         (titulo, tipo_material, estado_verificacao)
+       VALUES ($1, $2, $3)
        RETURNING id`,
-      [titulo, titulo_original, idioma_original, tipo_material, observacoes, estadoObraFinal]
+      [titulo, tipo_material, estadoObraFinal]
     );
     const obraId = obraR.rows[0].id;
 
@@ -1194,15 +1180,12 @@ app.post("/obras/nova", async (req, res) => {
       );
     }
 
-    if (incluir_edicao) {
+    if (temDadosEdicao) {
       await client.query(
         `INSERT INTO edicoes
-           (obra_id, editora, ano, numero_edicao, traducao, idioma, isbn,
-            link_referencia, capa_url, observacoes, estado_verificacao)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [obraId, edicao_editora, edicao_ano, edicao_numero, edicao_traducao,
-         edicao_idioma, edicao_isbn, edicao_link, edicao_capa_url,
-         edicao_observacoes, edicao_estado]
+           (obra_id, editora, ano, isbn, capa_url, estado_verificacao)
+         VALUES ($1, $2, $3, $4, $5, 'pendente')`,
+        [obraId, edicao_editora, edicao_ano, edicao_isbn, edicao_capa_url]
       );
     }
 
@@ -1218,14 +1201,13 @@ app.post("/obras/nova", async (req, res) => {
       cancelarUrl: "/obras",
       obraId: null,
       valores: {
-        titulo, titulo_original: titulo_original || "", idioma_original: idioma_original || "",
-        tipo_material, autores: autoresRaw, observacoes: observacoes || "", estado_verificacao,
-        edicao_editora: edicao_editora || "", edicao_ano: edicao_anoRaw, edicao_numero: edicao_numero || "",
-        edicao_traducao: edicao_traducao || "", edicao_idioma: edicao_idioma || "",
-        edicao_isbn: edicao_isbn || "", edicao_link: edicao_link || "",
-        edicao_capa_url: edicao_capa_url || "",
-        edicao_observacoes: edicao_observacoes || "", edicao_estado,
-        incluir_edicao
+        titulo,
+        tipo_material,
+        autores: autoresRaw,
+        edicao_editora: edicao_editora || "",
+        edicao_ano: edicao_anoRaw,
+        edicao_isbn: edicao_isbn || "",
+        edicao_capa_url: edicao_capa_url || ""
       },
       erros: ["Erro interno ao salvar. Nada foi gravado."],
       tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
@@ -1767,8 +1749,7 @@ app.get("/obras/:id/editar", async (req, res) => {
   }
 
   const or = await pool.query(
-    `SELECT id, titulo, titulo_original, idioma_original, tipo_material,
-            observacoes, estado_verificacao
+    `SELECT id, titulo, tipo_material
        FROM obras WHERE id = $1`,
     [id]
   );
@@ -1791,12 +1772,8 @@ app.get("/obras/:id/editar", async (req, res) => {
     obraId: id,
     valores: {
       titulo: obra.titulo,
-      titulo_original: obra.titulo_original || "",
-      idioma_original: obra.idioma_original || "",
       tipo_material: obra.tipo_material,
-      autores: autoresTexto,
-      observacoes: obra.observacoes || "",
-      estado_verificacao: obra.estado_verificacao
+      autores: autoresTexto
     },
     erros: [],
     tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
@@ -1816,17 +1793,12 @@ app.post("/obras/:id/editar", async (req, res) => {
   }
 
   const titulo = String(req.body.titulo || "").trim();
-  const titulo_original = String(req.body.titulo_original || "").trim() || null;
-  const idioma_original = String(req.body.idioma_original || "").trim() || null;
   const tipo_material = String(req.body.tipo_material || "livro").trim();
   const autoresRaw = String(req.body.autores || "").trim();
-  const observacoes = String(req.body.observacoes || "").trim() || null;
-  const estado_verificacao = String(req.body.estado_verificacao || "pendente").trim();
 
   const erros = [];
   if (!titulo) erros.push("O título da obra é obrigatório.");
   if (!ROTULO_TIPO_MATERIAL[tipo_material]) erros.push("Tipo de material inválido.");
-  if (!ROTULO_ESTADO_VERIFICACAO[estado_verificacao]) erros.push("Estado de verificação inválido.");
 
   const autores = autoresRaw
     .split("\n")
@@ -1842,22 +1814,13 @@ app.post("/obras/:id/editar", async (req, res) => {
       obraId: id,
       valores: {
         titulo,
-        titulo_original: titulo_original || "",
-        idioma_original: idioma_original || "",
         tipo_material,
-        autores: autoresRaw,
-        observacoes: observacoes || "",
-        estado_verificacao
+        autores: autoresRaw
       },
       erros,
       tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
       estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
     });
-  }
-
-  let estadoFinal = estado_verificacao;
-  if (autores.length === 0 && estadoFinal === "verificada") {
-    estadoFinal = "incompleta";
   }
 
   const client = await pool.connect();
@@ -1867,14 +1830,10 @@ app.post("/obras/:id/editar", async (req, res) => {
     await client.query(
       `UPDATE obras
           SET titulo = $1,
-              titulo_original = $2,
-              idioma_original = $3,
-              tipo_material = $4,
-              observacoes = $5,
-              estado_verificacao = $6,
+              tipo_material = $2,
               atualizado_em = now()
-        WHERE id = $7`,
-      [titulo, titulo_original, idioma_original, tipo_material, observacoes, estadoFinal, id]
+        WHERE id = $3`,
+      [titulo, tipo_material, id]
     );
 
     await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [id]);
@@ -1917,14 +1876,8 @@ app.get("/obras/:id/edicoes/nova", async (req, res) => {
     valores: {
       editora: "",
       ano: "",
-      numero_edicao: "",
-      traducao: "",
-      idioma: "",
       isbn: "",
-      link_referencia: "",
-      capa_url: "",
-      observacoes: "",
-      estado_verificacao: "pendente"
+      capa_url: ""
     },
     erros: [],
     estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
@@ -1945,17 +1898,10 @@ app.post("/obras/:id/edicoes/nova", async (req, res) => {
 
   const editora = String(req.body.editora || "").trim() || null;
   const anoRaw = String(req.body.ano || "").trim();
-  const numero_edicao = String(req.body.numero_edicao || "").trim() || null;
-  const traducao = String(req.body.traducao || "").trim() || null;
-  const idioma = String(req.body.idioma || "").trim() || null;
   const isbn = String(req.body.isbn || "").trim() || null;
-  const link_referencia = String(req.body.link_referencia || "").trim() || null;
   const capa_url = String(req.body.capa_url || "").trim() || null;
-  const observacoes = String(req.body.observacoes || "").trim() || null;
-  const estado_verificacao = String(req.body.estado_verificacao || "pendente").trim();
 
   const erros = [];
-  if (!ROTULO_ESTADO_VERIFICACAO[estado_verificacao]) erros.push("Estado de verificação inválido.");
 
   let ano = null;
   if (anoRaw) {
@@ -1974,7 +1920,7 @@ app.post("/obras/:id/edicoes/nova", async (req, res) => {
       acao: `/obras/${id}/edicoes/nova`,
       cancelarUrl: `/obras/${id}`,
       obra,
-      valores: { editora: editora || "", ano: anoRaw, numero_edicao: numero_edicao || "", traducao: traducao || "", idioma: idioma || "", isbn: isbn || "", link_referencia: link_referencia || "", capa_url: capa_url || "", observacoes: observacoes || "", estado_verificacao },
+      valores: { editora: editora || "", ano: anoRaw, isbn: isbn || "", capa_url: capa_url || "" },
       erros,
       estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
     });
@@ -1982,9 +1928,9 @@ app.post("/obras/:id/edicoes/nova", async (req, res) => {
 
   await pool.query(
     `INSERT INTO edicoes
-       (obra_id, editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, capa_url, observacoes, estado_verificacao)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [id, editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, capa_url, observacoes, estado_verificacao]
+       (obra_id, editora, ano, isbn, capa_url, estado_verificacao)
+     VALUES ($1, $2, $3, $4, $5, 'pendente')`,
+    [id, editora, ano, isbn, capa_url]
   );
 
   res.redirect(`/obras/${id}?salvo=1`);
@@ -2004,8 +1950,7 @@ app.get("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
   const obra = or.rows[0];
 
   const er = await pool.query(
-    `SELECT id, editora, ano, numero_edicao, traducao, idioma, isbn,
-            link_referencia, observacoes, estado_verificacao, capa_url
+    `SELECT id, editora, ano, isbn, capa_url
        FROM edicoes WHERE id = $1 AND obra_id = $2`,
     [edicaoId, id]
   );
@@ -2023,14 +1968,8 @@ app.get("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
     valores: {
       editora: edicao.editora || "",
       ano: edicao.ano != null ? String(edicao.ano) : "",
-      numero_edicao: edicao.numero_edicao || "",
-      traducao: edicao.traducao || "",
-      idioma: edicao.idioma || "",
       isbn: edicao.isbn || "",
-      link_referencia: edicao.link_referencia || "",
-      capa_url: edicao.capa_url || "",
-      observacoes: edicao.observacoes || "",
-      estado_verificacao: edicao.estado_verificacao
+      capa_url: edicao.capa_url || ""
     },
     erros: [],
     estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
@@ -2057,17 +1996,10 @@ app.post("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
 
   const editora = String(req.body.editora || "").trim() || null;
   const anoRaw = String(req.body.ano || "").trim();
-  const numero_edicao = String(req.body.numero_edicao || "").trim() || null;
-  const traducao = String(req.body.traducao || "").trim() || null;
-  const idioma = String(req.body.idioma || "").trim() || null;
   const isbn = String(req.body.isbn || "").trim() || null;
-  const link_referencia = String(req.body.link_referencia || "").trim() || null;
   const capa_url = String(req.body.capa_url || "").trim() || null;
-  const observacoes = String(req.body.observacoes || "").trim() || null;
-  const estado_verificacao = String(req.body.estado_verificacao || "pendente").trim();
 
   const erros = [];
-  if (!ROTULO_ESTADO_VERIFICACAO[estado_verificacao]) erros.push("Estado de verificação inválido.");
 
   let ano = null;
   if (anoRaw) {
@@ -2086,7 +2018,7 @@ app.post("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
       acao: `/obras/${id}/edicoes/${edicaoId}/editar`,
       cancelarUrl: `/obras/${id}`,
       obra,
-      valores: { editora: editora || "", ano: anoRaw, numero_edicao: numero_edicao || "", traducao: traducao || "", idioma: idioma || "", isbn: isbn || "", link_referencia: link_referencia || "", capa_url: capa_url || "", observacoes: observacoes || "", estado_verificacao },
+      valores: { editora: editora || "", ano: anoRaw, isbn: isbn || "", capa_url: capa_url || "" },
       erros,
       estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
     });
@@ -2094,11 +2026,9 @@ app.post("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
 
   await pool.query(
     `UPDATE edicoes
-        SET editora = $1, ano = $2, numero_edicao = $3, traducao = $4, idioma = $5,
-            isbn = $6, link_referencia = $7, capa_url = $8, observacoes = $9,
-            estado_verificacao = $10, atualizado_em = now()
-      WHERE id = $11`,
-    [editora, ano, numero_edicao, traducao, idioma, isbn, link_referencia, capa_url, observacoes, estado_verificacao, edicaoId]
+        SET editora = $1, ano = $2, isbn = $3, capa_url = $4, atualizado_em = now()
+      WHERE id = $5`,
+    [editora, ano, isbn, capa_url, edicaoId]
   );
 
   res.redirect(`/obras/${id}?salvo=1`);
@@ -2158,7 +2088,7 @@ app.get("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   }
 
   const usoR = await pool.query(
-    `SELECT id, obra_id, edicao_id, papel, modalidade, orientacao, observacoes, estado_revisao
+    `SELECT id, obra_id, edicao_id, papel, modalidade, orientacao
        FROM usos WHERE id = $1 AND aula_id = $2`,
     [usoId, id]
   );
@@ -2180,7 +2110,7 @@ app.get("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   );
 
   const er = await pool.query(
-    `SELECT id, editora, ano, numero_edicao, idioma
+    `SELECT id, editora, ano, isbn
        FROM edicoes WHERE obra_id = $1
       ORDER BY ano NULLS LAST, id`,
     [uso.obra_id]
@@ -2210,8 +2140,6 @@ app.get("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
       papel: uso.papel,
       modalidade: uso.modalidade,
       orientacao: uso.orientacao || "",
-      observacoes: uso.observacoes || "",
-      estado_revisao: uso.estado_revisao,
       recortes
     },
     erros: [],
@@ -2220,7 +2148,6 @@ app.get("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
     cancelarUrl: `/unidades/${id}`,
     papeis: Object.entries(ROTULO_PAPEL),
     modalidades: Object.entries(ROTULO_MODALIDADE),
-    estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO),
     tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
   });
 });
@@ -2257,8 +2184,6 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   const papel = String(req.body.papel || "").trim();
   const modalidade = String(req.body.modalidade || "").trim();
   const orientacao = String(req.body.orientacao || "").trim() || null;
-  const observacoes = String(req.body.observacoes || "").trim() || null;
-  const estado_revisao = String(req.body.estado_revisao || "").trim();
 
   const rotulos = [].concat(req.body.recorte_rotulo || []);
   const tipos = [].concat(req.body.recorte_tipo || []);
@@ -2270,7 +2195,6 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   if (!obra_id) erros.push("Escolha uma obra.");
   if (!ROTULO_PAPEL[papel]) erros.push("Papel inválido.");
   if (!ROTULO_MODALIDADE[modalidade]) erros.push("Modalidade inválida.");
-  if (!ROTULO_ESTADO_REVISAO[estado_revisao]) erros.push("Estado de revisão inválido.");
 
   if (obra_id) {
     const o = await pool.query("SELECT id, arquivada FROM obras WHERE id = $1", [obra_id]);
@@ -2313,7 +2237,7 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
     let edicoes = [];
     if (obra_id) {
       const er = await pool.query(
-        `SELECT id, editora, ano, numero_edicao, idioma
+        `SELECT id, editora, ano, isbn
            FROM edicoes WHERE obra_id = $1
           ORDER BY ano NULLS LAST, id`,
         [obra_id]
@@ -2331,8 +2255,6 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
         obra_id: obra_id ? String(obra_id) : "",
         edicao_id: edicao_id ? String(edicao_id) : "",
         papel, modalidade, orientacao: orientacao || "",
-        observacoes: observacoes || "",
-        estado_revisao,
         recortes: recortes.length > 0 ? recortes : [
           { rotulo: "", tipo: "capitulo", inicio: "", fim: "", observacao: "" }
         ]
@@ -2343,7 +2265,6 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
       cancelarUrl: `/unidades/${id}`,
       papeis: Object.entries(ROTULO_PAPEL),
       modalidades: Object.entries(ROTULO_MODALIDADE),
-      estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO),
       tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
     });
   }
@@ -2355,10 +2276,9 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
     await client.query(
       `UPDATE usos
           SET obra_id = $1, edicao_id = $2, papel = $3, modalidade = $4,
-              orientacao = $5, observacoes = $6, estado_revisao = $7,
-              atualizado_em = now()
-        WHERE id = $8`,
-      [obra_id, edicao_id, papel, modalidade, orientacao, observacoes, estado_revisao, usoId]
+              orientacao = $5, atualizado_em = now()
+        WHERE id = $6`,
+      [obra_id, edicao_id, papel, modalidade, orientacao, usoId]
     );
 
     await client.query("DELETE FROM usos_recortes WHERE uso_id = $1", [usoId]);
@@ -2419,7 +2339,7 @@ app.get("/unidades/:id/usos/novo", async (req, res) => {
   let edicoes = [];
   if (obraPre) {
     const er = await pool.query(
-      `SELECT id, editora, ano, numero_edicao, idioma
+      `SELECT id, editora, ano, isbn
          FROM edicoes WHERE obra_id = $1
         ORDER BY ano NULLS LAST, id`,
       [obraPre]
@@ -2441,8 +2361,6 @@ app.get("/unidades/:id/usos/novo", async (req, res) => {
       papel: "texto_base",
       modalidade: "parcial",
       orientacao: "",
-      observacoes: "",
-      estado_revisao: "a_avaliar",
       recortes: [
         { rotulo: "", tipo: "capitulo", inicio: "", fim: "", observacao: "" }
       ]
@@ -2453,7 +2371,6 @@ app.get("/unidades/:id/usos/novo", async (req, res) => {
     cancelarUrl: `/unidades/${id}`,
     papeis: Object.entries(ROTULO_PAPEL),
     modalidades: Object.entries(ROTULO_MODALIDADE),
-    estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO),
     tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
   });
 });
@@ -2464,7 +2381,7 @@ app.get("/obras/:id/edicoes.json", async (req, res) => {
     return res.status(400).json({ erro: "Id inválido." });
   }
   const r = await pool.query(
-    `SELECT id, editora, ano, numero_edicao, idioma, capa_url
+    `SELECT id, editora, ano, isbn, capa_url
        FROM edicoes WHERE obra_id = $1
       ORDER BY ano NULLS LAST, id`,
     [id]
@@ -2495,8 +2412,6 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
   const papel = String(req.body.papel || "").trim();
   const modalidade = String(req.body.modalidade || "").trim();
   const orientacao = String(req.body.orientacao || "").trim() || null;
-  const observacoes = String(req.body.observacoes || "").trim() || null;
-  const estado_revisao = String(req.body.estado_revisao || "").trim();
 
   const rotulos = [].concat(req.body.recorte_rotulo || []);
   const tipos = [].concat(req.body.recorte_tipo || []);
@@ -2508,7 +2423,6 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
   if (!obra_id) erros.push("Escolha uma obra.");
   if (!ROTULO_PAPEL[papel]) erros.push("Papel inválido.");
   if (!ROTULO_MODALIDADE[modalidade]) erros.push("Modalidade inválida.");
-  if (!ROTULO_ESTADO_REVISAO[estado_revisao]) erros.push("Estado de revisão inválido.");
 
   if (obra_id) {
     const o = await pool.query("SELECT id, arquivada FROM obras WHERE id = $1", [obra_id]);
@@ -2554,7 +2468,7 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
     let edicoes = [];
     if (obra_id) {
       const er = await pool.query(
-        `SELECT id, editora, ano, numero_edicao, idioma
+        `SELECT id, editora, ano, isbn
            FROM edicoes WHERE obra_id = $1
           ORDER BY ano NULLS LAST, id`,
         [obra_id]
@@ -2572,8 +2486,6 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
         obra_id: obra_id ? String(obra_id) : "",
         edicao_id: edicao_id ? String(edicao_id) : "",
         papel, modalidade, orientacao: orientacao || "",
-        observacoes: observacoes || "",
-        estado_revisao,
         recortes: recortes.length > 0 ? recortes : [
           { rotulo: "", tipo: "capitulo", inicio: "", fim: "", observacao: "" }
         ]
@@ -2584,7 +2496,6 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
       cancelarUrl: `/unidades/${id}`,
       papeis: Object.entries(ROTULO_PAPEL),
       modalidades: Object.entries(ROTULO_MODALIDADE),
-      estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO),
       tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
     });
   }
@@ -2595,10 +2506,10 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
 
     const usoR = await client.query(
       `INSERT INTO usos
-         (aula_id, obra_id, edicao_id, papel, modalidade, orientacao, observacoes, estado_revisao)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (aula_id, obra_id, edicao_id, papel, modalidade, orientacao, estado_revisao)
+       VALUES ($1, $2, $3, $4, $5, $6, 'a_avaliar')
        RETURNING id`,
-      [id, obra_id, edicao_id, papel, modalidade, orientacao, observacoes, estado_revisao]
+      [id, obra_id, edicao_id, papel, modalidade, orientacao]
     );
     const usoId = usoR.rows[0].id;
 

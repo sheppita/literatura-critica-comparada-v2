@@ -53,6 +53,11 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D47 | Texto da ficha justificado em telas ≥ 700px, com hifenização automática | consolidada |
 | D48 | Capa da edição por URL (sem upload); exibida em obra, aula e catálogo | consolidada |
 | D49 | No catálogo, capa exibida é a da edição mais recente (por ano) | consolidada |
+| D50 | Formulário de Nova Obra: apenas Título, Autoria, Tipo de material e bloco de Primeira Edição (Editora, Ano, ISBN, Capa) | consolidada |
+| D51 | Formulário de Edição: apenas Editora, Ano, ISBN, Capa | consolidada |
+| D52 | Formulário de Uso: Estado de revisão e Observações removidos da interface | consolidada |
+| D53 | Bloco de Primeira Edição sempre visível; edição só é criada se ao menos um campo dela for preenchido | consolidada |
+| D54 | Campos removidos da interface continuam existindo no banco (decisão reversível) | consolidada |
 
 ## Regras de trabalho
 
@@ -63,6 +68,12 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 - **R5:** ao final de cada fase, os arquivos `DECISIONS.md` e `STATUS.md` são atualizados e commitados.
 - **R6:** quando o volume crescer, o padrão de "busca com autocomplete no servidor" substitui os `<select>` com listas grandes.
 - **R7:** arquivos de código são enviados **inteiros**, sempre. Exceções: `estilo.css` (aditivo) e SQL (executado por comando). A preferência da usuária é o padrão.
+- **R8:** perguntar à usuária antes de dividir arquivo grande em trechos. A decisão de receber inteiro ou em pedaços é dela.
+- **R9:** quando houver dúvida entre manter um campo pela spec e remover pela simplicidade do uso, **o uso manda**. YAGNI reverso: construir, ver e remover é melhor que construir enxuto demais e descobrir depois que faltava.
+
+## Comportamentos conhecidos (não são bugs)
+
+- O aviso "Sair do site?" (`beforeunload`) é suprimido por navegadores em alguns casos, como cliques em links da mesma origem. Não é falha do código; é limitação do navegador.
 
 ## Observações
 

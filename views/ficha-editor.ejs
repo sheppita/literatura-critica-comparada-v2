@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="/estilo.css">
 </head>
 <body>
-    
-<%- include('./partials/navbar') %>    
+  <%- include('./partials/navbar') %>
+
   <p class="caminho">
     <a href="/">Início</a>
     <% for (const u of cadeia) { %>
@@ -105,15 +105,13 @@
     <div class="acoes">
       <button type="submit">Salvar</button>
       <button type="button" id="btn-preview" class="ghost">Pré-visualizar</button>
-      <a class="botao-ghost" href="/unidades/<%= unidade.id %>">Cancelar</a>
+      <a class="botao-ghost" href="/unidades/<%= unidade.id %>" id="btn-cancelar">Cancelar</a>
     </div>
   </form>
 
   <div id="area-preview" class="ficha-conteudo" style="display:none;"></div>
 
-  <footer>
-    <a href="/health">/health</a>
-  </footer>
+  <%- include('./partials/botoes-flutuantes') %>
 
   <script>
     (function () {
@@ -123,8 +121,8 @@
       const form = document.getElementById("form-ficha");
       const btnPreview = document.getElementById("btn-preview");
       const areaPreview = document.getElementById("area-preview");
+      const btnCancelar = document.getElementById("btn-cancelar");
 
-      // Snapshot do estado inicial de cada campo
       const textoInicial = textarea.value;
       const estadoTextoInicial = selectTexto.value;
       const estadoBiblioInicial = selectBiblio.value;
@@ -137,20 +135,25 @@
         );
       }
 
-      // Aviso antes de sair com alterações não salvas
-      window.addEventListener("beforeunload", (e) => {
+      function bloquearSaida(e) {
         if (estaDirty()) {
           e.preventDefault();
           e.returnValue = "";
         }
-      });
+      }
+
+      window.addEventListener("beforeunload", bloquearSaida);
 
       form.addEventListener("submit", () => {
-        // Desabilita o aviso ao enviar o formulário (o navegador vai sair da página)
-        window.removeEventListener("beforeunload", () => {});
+        window.removeEventListener("beforeunload", bloquearSaida);
       });
 
-      // Botões de formatação
+      if (btnCancelar) {
+        btnCancelar.addEventListener("click", () => {
+          window.removeEventListener("beforeunload", bloquearSaida);
+        });
+      }
+
       const acoes = {
         bold: (sel) => "**" + sel + "**",
         italic: (sel) => "*" + sel + "*",
@@ -214,6 +217,5 @@
       });
     })();
   </script>
-<%- include('./partials/botoes-flutuantes') %>
 </body>
 </html>
