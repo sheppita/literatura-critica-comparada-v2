@@ -22,12 +22,11 @@ app.set("views", path.join(__dirname, "views"));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const TIPOS_VALIDOS = ["eixo", "disciplina", "modulo", "tema", "aula"];
+const TIPOS_VALIDOS = ["eixo", "disciplina", "tema", "aula"];
 
 const ROTULO_TIPO = {
   eixo: "Eixo",
   disciplina: "Disciplina",
-  modulo: "Módulo",
   tema: "Tema",
   aula: "Aula"
 };
@@ -35,28 +34,25 @@ const ROTULO_TIPO = {
 const ROTULO_NOVO = {
   eixo: "Novo Eixo",
   disciplina: "Nova Disciplina",
-  modulo: "Novo Módulo",
   tema: "Novo Tema",
   aula: "Nova Aula"
 };
 
 const PROXIMO_NIVEL = {
   eixo: "disciplina",
-  disciplina: "modulo",
-  modulo: "tema",
+  disciplina: "tema",
   tema: "aula",
   aula: null
 };
 
 const NOME_FILHO_PLURAL = {
   eixo: "disciplinas",
-  disciplina: "módulos",
-  modulo: "temas",
+  disciplina: "temas",
   tema: "aulas",
   aula: null
 };
 
-const TIPOS_COM_DESCRICAO = ["eixo", "disciplina", "modulo"];
+const TIPOS_COM_DESCRICAO = ["eixo", "disciplina"];
 
 const ROTULO_ESTADO_TEXTO = {
   rascunho: "Rascunho",
@@ -143,7 +139,7 @@ async function cadeiaDeSuperiores(id) {
 app.get("/", async (req, res) => {
   try {
     const r = await pool.query(
-      "SELECT id, titulo, codigo FROM unidades WHERE tipo = 'eixo' ORDER BY ordem, id"
+      "SELECT id, titulo, codigo FROM unidades WHERE tipo = 'eixo' AND arquivada = false ORDER BY ordem, id"
     );
     res.render("inicio", {
       titulo: "Literatura Crítica Comparada",
@@ -220,7 +216,7 @@ app.post("/unidades/nova", async (req, res) => {
       erros.push("Unidade superior não encontrada.");
     } else {
       superior = r.rows[0];
-      const esperado = { disciplina: "eixo", modulo: "disciplina", tema: "modulo", aula: "tema" };
+      const esperado = { disciplina: "eixo", tema: "disciplina", aula: "tema" };
       if (esperado[tipo] && superior.tipo !== esperado[tipo]) {
         erros.push(`Uma ${ROTULO_TIPO[tipo]} deve pertencer a um(a) ${ROTULO_TIPO[esperado[tipo]]}.`);
       }
@@ -249,7 +245,8 @@ app.post("/unidades/nova", async (req, res) => {
     `SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima
        FROM unidades
       WHERE tipo = $1
-        AND superior_id IS NOT DISTINCT FROM $2`,
+        AND superior_id IS NOT DISTINCT FROM $2
+        AND arquivada = false`,
     [tipo, superiorId]
   );
   const ordem = ordemR.rows[0].proxima;
@@ -406,7 +403,7 @@ app.get("/unidades/:id/excluir", async (req, res) => {
   const u = r.rows[0];
 
   const filhosR = await pool.query(
-    "SELECT id, tipo, titulo FROM unidades WHERE superior_id = $1 ORDER BY ordem, id",
+    "SELECT id, tipo, titulo FROM unidades WHERE superior_id = $1 AND arquivada = false ORDER BY ordem, id",
     [id]
   );
 
@@ -444,7 +441,7 @@ app.post("/unidades/:id/excluir", async (req, res) => {
   const u = r.rows[0];
 
   const filhosR = await pool.query(
-    "SELECT id, tipo, titulo FROM unidades WHERE superior_id = $1",
+    "SELECT id, tipo, titulo FROM unidades WHERE superior_id = $1 AND arquivada = false",
     [id]
   );
   if (filhosR.rows.length > 0) {
@@ -465,85 +462,6 @@ app.post("/unidades/:id/excluir", async (req, res) => {
   } else {
     res.redirect("/");
   }
-});
-
-// ----- Rota: tela intermediária para nova aula -----
-
-app.get("/aulas/nova", async (req, res) => {
-  const busca = String(req.query.q || "").trim();
-
-  const temasR = await pool.query(
-    `SELECT
-        t.id AS tema_id, t.titulo AS tema_titulo, t.codigo AS tema_codigo,
-        m.id AS modulo_id, m.titulo AS modulo_titulo,
-        d.id AS disciplina_id, d.titulo AS disciplina_titulo,
-        e.id AS eixo_id, e.titulo AS eixo_titulo
-       FROM unidades t
-       JOIN unidades m ON m.id = t.superior_id AND m.tipo = 'modulo'
-       JOIN unidades d ON d.id = m.superior_id AND d.tipo = 'disciplina'
-       JOIN unidades e ON e.id = d.superior_id AND e.tipo = 'eixo'
-      WHERE t.tipo = 'tema'
-      ORDER BY e.ordem, e.titulo, d.ordem, d.titulo, m.ordem, m.titulo, t.ordem, t.titulo`
-  );
-
-  let temas = temasR.rows;
-  if (busca) {
-    const b = busca.toLowerCase();
-    temas = temas.filter((t) =>
-      t.tema_titulo.toLowerCase().includes(b) ||
-      (t.tema_codigo && t.tema_codigo.toLowerCase().includes(b)) ||
-      t.modulo_titulo.toLowerCase().includes(b) ||
-      t.disciplina_titulo.toLowerCase().includes(b) ||
-      t.eixo_titulo.toLowerCase().includes(b)
-    );
-  }
-
-  const porEixo = new Map();
-  for (const t of temas) {
-    if (!porEixo.has(t.eixo_id)) {
-      porEixo.set(t.eixo_id, {
-        id: t.eixo_id,
-        titulo: t.eixo_titulo,
-        disciplinas: new Map()
-      });
-    }
-    const eixo = porEixo.get(t.eixo_id);
-    if (!eixo.disciplinas.has(t.disciplina_id)) {
-      eixo.disciplinas.set(t.disciplina_id, {
-        id: t.disciplina_id,
-        titulo: t.disciplina_titulo,
-        modulos: new Map()
-      });
-    }
-    const disc = eixo.disciplinas.get(t.disciplina_id);
-    if (!disc.modulos.has(t.modulo_id)) {
-      disc.modulos.set(t.modulo_id, {
-        id: t.modulo_id,
-        titulo: t.modulo_titulo,
-        temas: []
-      });
-    }
-    disc.modulos.get(t.modulo_id).temas.push({
-      id: t.tema_id,
-      titulo: t.tema_titulo,
-      codigo: t.tema_codigo
-    });
-  }
-
-  const estrutura = Array.from(porEixo.values()).map((e) => ({
-    ...e,
-    disciplinas: Array.from(e.disciplinas.values()).map((d) => ({
-      ...d,
-      modulos: Array.from(d.modulos.values())
-    }))
-  }));
-
-  res.render("aula-nova-escolher-tema", {
-    titulo: "Nova Aula — Escolher Tema",
-    busca,
-    estrutura,
-    totalTemas: temas.length
-  });
 });
 
 // ----- Rotas de ficha -----
@@ -932,9 +850,7 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
   }
 });
 
-// ----- Fim das rotas de ficha -----
-
-// ----- Rotas de bibliografia -----
+// ----- Fim das rotas de ficha -----// ----- Rotas de bibliografia -----
 
 app.get("/obras", async (req, res) => {
   try {
@@ -988,8 +904,7 @@ app.get("/obras", async (req, res) => {
                       FROM usos u
                       JOIN unidades aula ON aula.id = u.aula_id
                       LEFT JOIN unidades tema ON tema.id = aula.superior_id
-                      LEFT JOIN unidades modulo ON modulo.id = tema.superior_id
-                      LEFT JOIN unidades disciplina ON disciplina.id = modulo.superior_id
+                      LEFT JOIN unidades disciplina ON disciplina.id = tema.superior_id
                       LEFT JOIN unidades eixo ON eixo.id = disciplina.superior_id
                      WHERE u.obra_id = o.id
                   ) sub
@@ -1132,7 +1047,6 @@ app.post("/obras/nova", async (req, res) => {
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
-  // Só cria edição se pelo menos um campo dela foi preenchido
   const temDadosEdicao = Boolean(edicao_editora || edicao_ano || edicao_isbn || edicao_capa_url);
 
   if (erros.length > 0) {
@@ -1157,7 +1071,6 @@ app.post("/obras/nova", async (req, res) => {
     });
   }
 
-  // Estado da obra: incompleta se não tem autor, senão pendente
   const estadoObraFinal = autores.length === 0 ? "incompleta" : "pendente";
 
   const client = await pool.connect();
@@ -2571,7 +2484,7 @@ app.get("/unidades/:id", async (req, res) => {
   const unidade = r.rows[0];
 
   const filhosR = await pool.query(
-    "SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 ORDER BY ordem, id",
+    "SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 AND arquivada = false ORDER BY ordem, id",
     [id]
   );
 
@@ -2684,7 +2597,7 @@ app.get("/unidades/:id", async (req, res) => {
 
 app.get("/health", async (req, res) => {
   try {
-    const r = await pool.query("SELECT COUNT(*)::int AS total FROM unidades");
+    const r = await pool.query("SELECT COUNT(*)::int AS total FROM unidades WHERE arquivada = false");
     res.json({
       status: "ok",
       service: "literatura-critica-comparada-v2",

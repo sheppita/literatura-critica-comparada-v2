@@ -795,61 +795,6 @@ body {
   transform: scale(1.05);
 }
 
-/* Tela de nova aula — escolher tema */
-.bloco-eixo {
-  margin-top: 2rem;
-}
-.bloco-eixo > h2 {
-  font-size: 1.2rem;
-  color: var(--marrom);
-  border-bottom: 2px solid var(--mostarda);
-  padding-bottom: 0.3rem;
-  margin-bottom: 0.75rem;
-}
-
-.bloco-disciplina {
-  margin-left: 1rem;
-  margin-bottom: 1rem;
-}
-.bloco-disciplina > h3 {
-  font-size: 1rem;
-  color: var(--marrom);
-  margin: 0.75rem 0 0.4rem;
-  font-weight: 600;
-}
-
-.bloco-modulo {
-  margin-left: 1rem;
-  margin-bottom: 0.6rem;
-}
-.rotulo-modulo {
-  font-size: 0.9rem;
-  color: var(--texto-suave);
-  font-weight: 600;
-  margin: 0.4rem 0 0.2rem;
-}
-
-.lista-temas {
-  list-style: none;
-  padding-left: 0.75rem;
-}
-.lista-temas li {
-  padding: 0.25rem 0;
-}
-.lista-temas a {
-  color: var(--terracota);
-  text-decoration: none;
-}
-.lista-temas a:hover {
-  text-decoration: underline;
-}
-.link-acao {
-  color: var(--texto-suave);
-  font-size: 0.8rem;
-  margin-left: 0.4rem;
-  opacity: 0.7;
-}
-
 /* ===== Navbar em telas estreitas ===== */
 @media (max-width: 600px) {
   .navbar-conteudo {

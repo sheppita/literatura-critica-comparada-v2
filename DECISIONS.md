@@ -4,7 +4,7 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 
 | # | Decisão | Status |
 |---|---|---|
-| D1 | Hierarquia curricular: Eixo → Disciplina → Módulo → Tema → Aula | consolidada |
+| D1 | Hierarquia curricular: Eixo → Disciplina → Módulo → Tema → Aula | substituída por D55 |
 | D2 | Leitura pública; edição exige login | consolidada |
 | D3 | Editor de ficha: Markdown + pré-visualização + botões de formatação | consolidada |
 | D4 | Começar por Fase 0 + Fase 1 | consolidada |
@@ -18,7 +18,7 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D12 | Paleta: cozy autumn (creme, terracota, mostarda, marrom, verde-musgo) | consolidada |
 | D13 | CSS centralizado em `public/estilo.css` | consolidada |
 | D14 | Banner apenas na página inicial; favicon em todas | substituída por D44 |
-| D15 | Descrição existe apenas em eixo, disciplina e módulo. Tema usa pergunta norteadora. Aula terá ficha. | consolidada |
+| D15 | Descrição existe apenas em eixo, disciplina e módulo. Tema usa pergunta norteadora. | substituída por D58 |
 | D16 | Títulos digitados pela usuária não são capitalizados pelo sistema. Title Case só nos rótulos gerados. | consolidada |
 | D17 | Tabelas `fichas` e `fichas_versoes` (1-para-1 com aula) | consolidada |
 | D18 | Toda aula tem ficha em branco desde a criação | consolidada |
@@ -48,7 +48,7 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D42 | "Edição não informada" e "Recorte não informado" exibidos explicitamente | consolidada |
 | D43 | Regra de omissão do tipo: se o código começa com o nome do tipo, mostra só o código | consolidada |
 | D44 | Banner removido; barra fixa no topo em todas as páginas | consolidada |
-| D45 | Botão "+ Aula" leva a uma tela intermediária de escolha de tema (lista agrupada com busca) | consolidada |
+| D45 | Botão "+ Aula" leva a uma tela intermediária de escolha de tema | substituída por D59 |
 | D46 | Botões flutuantes "ir pro topo/fundo": desativados em telas < 600px; ⬇️ desaparece quando está no fundo | consolidada |
 | D47 | Texto da ficha justificado em telas ≥ 700px, com hifenização automática | consolidada |
 | D48 | Capa da edição por URL (sem upload); exibida em obra, aula e catálogo | consolidada |
@@ -58,6 +58,12 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D52 | Formulário de Uso: Estado de revisão e Observações removidos da interface | consolidada |
 | D53 | Bloco de Primeira Edição sempre visível; edição só é criada se ao menos um campo dela for preenchido | consolidada |
 | D54 | Campos removidos da interface continuam existindo no banco (decisão reversível) | consolidada |
+| D55 | Hierarquia curricular agora é **Eixo → Disciplina → Tema → Aula**. Nível "Módulo" removido. | consolidada |
+| D56 | Módulos existentes foram **arquivados** (`arquivada = true`), não apagados. Reversível. | consolidada |
+| D57 | A constraint `unidades_tipo_check` permite `modulo` apenas quando `arquivada = true` — impede criação de módulo novo. | consolidada |
+| D58 | Constraint `descricao` só se aplica a eixo e disciplina (não mais módulo). | consolidada |
+| D59 | Botão "+ Aula" removido da navbar. Criação de aula acontece dentro do tema. | consolidada |
+| D60 | Rota `/aulas/nova` e template `aula-nova-escolher-tema.ejs` removidos. | consolidada |
 
 ## Regras de trabalho
 
@@ -70,6 +76,7 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 - **R7:** arquivos de código são enviados **inteiros**, sempre. Exceções: `estilo.css` (aditivo) e SQL (executado por comando). A preferência da usuária é o padrão.
 - **R8:** perguntar à usuária antes de dividir arquivo grande em trechos. A decisão de receber inteiro ou em pedaços é dela.
 - **R9:** quando houver dúvida entre manter um campo pela spec e remover pela simplicidade do uso, **o uso manda**. YAGNI reverso: construir, ver e remover é melhor que construir enxuto demais e descobrir depois que faltava.
+- **R10:** ao remover uma camada da hierarquia, os dados dessa camada são **arquivados**, não apagados — reversível até que se decida o contrário.
 
 ## Comportamentos conhecidos (não são bugs)
 
@@ -79,5 +86,7 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 
 - O banco do Neon se chama `neondb` dentro do projeto `literatura-critica-comparada-v2`.
 - O protótipo antigo permanece arquivado em repositório separado.
-- Restrição no banco: `descricao_apenas_em_eixo_disciplina_modulo` (adicionada em out/2026).
 - Coluna `capa_url` em `edicoes` (adicionada em out/2026).
+- Coluna `arquivada` em `unidades` (adicionada em out/2026).
+- 9 módulos arquivados em `unidades` (`tipo = 'modulo'`, `arquivada = true`).
+- Constraints ativas em `unidades`: `unidades_tipo_check`, `descricao_apenas_em_eixo_disciplina`, `pergunta_norteadora_so_em_tema`.
