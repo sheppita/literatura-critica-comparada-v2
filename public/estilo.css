@@ -558,7 +558,7 @@ h2 {
 
 .recorte-linha {
   display: grid;
-  grid-template-columns: 130px 1fr 80px 80px 1fr 36px;
+  grid-template-columns: 130px 1fr 1fr 36px;
   gap: 0.4rem;
   align-items: center;
   margin-bottom: 0.5rem;
@@ -914,4 +914,100 @@ body {
 .link-perigo:hover {
   color: #8f1e14;
   text-decoration: underline;
+}
+
+/* Chips de estado de avaliação */
+.chip-avaliar {
+  background: var(--mostarda);
+  color: var(--marrom);
+}
+
+.chip-validado {
+  background: var(--verde-musgo);
+  color: #fff;
+}
+
+/* Uso destacado quando está a avaliar */
+.uso-item.uso-a-avaliar,
+.uso-aula-item.uso-a-avaliar {
+  border-left-color: var(--mostarda);
+}
+
+/* Botões de validar e reabrir */
+.botao-validar {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  background: var(--verde-musgo);
+  color: #fff;
+  border: 1.5px solid var(--verde-musgo);
+}
+.botao-validar:hover {
+  background: #5e6a3d;
+  border-color: #5e6a3d;
+  color: #fff;
+}
+
+.botao-reabrir {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.uso-botoes {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+/* Filtros em cápsula */
+.filtros-capsula {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1.5rem 0 1rem;
+  flex-wrap: wrap;
+}
+
+.capsula {
+  display: inline-block;
+  padding: 0.4rem 1rem;
+  background: var(--creme-escuro);
+  color: var(--marrom);
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 1.5px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.capsula:hover {
+  background: var(--mostarda);
+  color: var(--marrom);
+  text-decoration: none;
+}
+.capsula.capsula-ativa {
+  background: var(--terracota);
+  color: #fff;
+  border-color: var(--terracota);
+}
+
+/* Lista de revisão */
+.lista-revisao {
+  list-style: none;
+  padding-left: 0;
+}
+.revisao-item {
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.6rem;
+  background: var(--creme-escuro);
+  border-left: 4px solid var(--mostarda);
+  border-radius: 0 6px 6px 0;
+}
+.revisao-item a {
+  color: var(--marrom);
+  text-decoration: none;
+  font-size: 1.05rem;
+}
+.revisao-item a:hover {
+  color: var(--terracota);
 }

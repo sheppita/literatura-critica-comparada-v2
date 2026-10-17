@@ -74,9 +74,6 @@
               <div>
                 <strong><%= e.editora || 'Editora não informada' %></strong>
                 <% if (e.ano) { %>, <%= e.ano %><% } %>
-                <span class="chip chip-suave" style="margin-left: 0.5rem;">
-                  <%= e.rotuloEstadoVerificacao %>
-                </span>
               </div>
               <div style="display: flex; gap: 0.4rem;">
                 <a href="/obras/<%= obra.id %>/edicoes/<%= e.id %>/editar" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar</a>
@@ -115,15 +112,22 @@
 
     <ul class="lista-usos">
       <% for (const u of usos) { %>
-        <li class="uso-item">
+        <li class="uso-item <%= u.a_avaliar ? 'uso-a-avaliar' : '' %>">
           <div class="uso-com-capa">
             <% if (u.edicao_capa_url) { %>
               <img src="<%= u.edicao_capa_url %>" alt="" class="miniatura-capa miniatura-capa-uso">
             <% } %>
             <div class="uso-corpo">
-              <div>
-                <a href="/unidades/<%= u.aula_id %>"><strong><%= u.aula_titulo %></strong></a>
-                <% if (u.aula_codigo) { %> · <%= u.aula_codigo %><% } %>
+              <div class="uso-cabecalho">
+                <div>
+                  <a href="/unidades/<%= u.aula_id %>"><strong><%= u.aula_titulo %></strong></a>
+                  <% if (u.aula_codigo) { %> · <%= u.aula_codigo %><% } %>
+                </div>
+                <div class="uso-acoes">
+                  <span class="chip <%= u.a_avaliar ? 'chip-avaliar' : 'chip-validado' %>">
+                    <%= u.rotuloEstado %>
+                  </span>
+                </div>
               </div>
               <% if (u.caminho) { %>
                 <div class="detalhe-suave caminho-uso">
@@ -131,7 +135,7 @@
                 </div>
               <% } %>
               <div class="detalhe-suave">
-                Papel: <%= u.rotuloPapel %> · Modalidade: <%= u.rotuloModalidade %> · Revisão: <%= u.rotuloEstadoRevisao %>
+                Papel: <%= u.rotuloPapel %> · Modalidade: <%= u.rotuloModalidade %>
                 <% if (u.edicao_id) { %>
                   · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
                 <% } else { %>
@@ -155,7 +159,17 @@
               <% if (u.orientacao) { %>
                 <div class="detalhe-suave"><em><%= u.orientacao %></em></div>
               <% } %>
-              <div style="margin-top: 0.4rem;">
+              <div class="uso-botoes">
+                <% if (u.a_avaliar) { %>
+                  <form method="POST" action="/unidades/<%= u.aula_id %>/usos/<%= u.id %>/validar" style="display:inline;">
+                    <button type="submit" class="botao-ghost botao-validar">Validar</button>
+                  </form>
+                <% } else { %>
+                  <form method="POST" action="/unidades/<%= u.aula_id %>/usos/<%= u.id %>/reabrir" style="display:inline;"
+                        onsubmit="return confirm('Reabrir este uso para avaliação?');">
+                    <button type="submit" class="botao-ghost botao-reabrir">Reabrir</button>
+                  </form>
+                <% } %>
                 <a href="/unidades/<%= u.aula_id %>/usos/<%= u.id %>/editar" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar Uso</a>
               </div>
             </div>
@@ -163,60 +177,6 @@
         </li>
       <% } %>
     </ul>
-  <% } %>
-
-  <%# ===== DECISÕES DE REVISÃO ===== %>
-  <% if (usos.length > 0) { %>
-    <hr class="divisor">
-    <h2>Decisões de Revisão</h2>
-
-    <% if (decisoes.length === 0) { %>
-      <p class="aviso-vazio">
-        Nenhuma decisão registrada ainda. Quando você quiser marcar uma repetição
-        como validada (ou planejar substituição), registre uma decisão.
-      </p>
-    <% } else { %>
-      <ul class="lista-decisoes">
-        <% for (const d of decisoes) { %>
-          <li class="decisao-item <%= d.vencida ? 'decisao-vencida' : '' %>">
-            <div class="decisao-cabecalho">
-              <span class="chip"><%= d.rotuloEstado %></span>
-              <span class="detalhe-suave">
-                <%= new Date(d.criado_em).toLocaleString('pt-BR') %>
-              </span>
-              <form method="POST"
-                    action="/obras/<%= obra.id %>/decisoes/<%= d.id %>/excluir"
-                    style="display:inline;"
-                    onsubmit="return confirm('Excluir esta decisão? Ela não afeta os usos, só o registro da decisão.');">
-                <button type="submit" class="botao-ghost"
-                        style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Excluir</button>
-              </form>
-            </div>
-
-            <% if (d.vencida) { %>
-              <div class="aviso-vencida">
-                ⚠ Algum dos usos desta decisão foi alterado depois dela. Talvez seja hora de revisar.
-              </div>
-            <% } %>
-
-            <div class="decisao-justificativa"><%= d.justificativa %></div>
-
-            <div class="detalhe-suave">
-              Cobre <%= d.usos.length %> uso<%= d.usos.length === 1 ? '' : 's' %>:
-              <ul style="margin: 0.3rem 0 0 1rem;">
-                <% for (const u of d.usos) { %>
-                  <li><%= u.aula_titulo %> (<%= u.rotuloPapel %>)</li>
-                <% } %>
-              </ul>
-            </div>
-          </li>
-        <% } %>
-      </ul>
-    <% } %>
-
-    <p style="margin-top: 1rem;">
-      <a href="/obras/<%= obra.id %>/decisoes/nova" class="botao-ghost">+ Registrar Decisão</a>
-    </p>
   <% } %>
 
   <p style="margin-top: 2rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">

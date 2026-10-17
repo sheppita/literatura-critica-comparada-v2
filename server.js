@@ -92,17 +92,12 @@ const ROTULO_MODALIDADE = {
   parcial: "Leitura Parcial"
 };
 
-const ROTULO_ESTADO_REVISAO = {
-  a_avaliar: "A Avaliar",
-  repeticao_validada: "Repetição Validada",
-  substituicao_planejada: "Substituição Planejada",
-  resolvida: "Resolvida"
-};
-
 const ROTULO_RECORTE_TIPO = {
   capitulo: "Capítulo",
   secao: "Seção",
   ensaio: "Ensaio",
+  conto: "Conto",
+  poema: "Poema",
   a_conferir: "A Conferir"
 };
 
@@ -859,6 +854,7 @@ app.get("/obras", async (req, res) => {
     const busca = String(req.query.q || "").trim();
     const tipoFiltro = String(req.query.tipo || "").trim();
     const estadoFiltro = String(req.query.estado || "").trim();
+    const avaliacaoFiltro = String(req.query.avaliacao || "").trim();
 
     const condicoes = [];
     const params = [];
@@ -888,6 +884,31 @@ app.get("/obras", async (req, res) => {
 
     condicoes.push(`o.arquivada = false`);
 
+    // Filtro de avaliação
+    if (avaliacaoFiltro === "a_avaliar") {
+      condicoes.push(`EXISTS (
+        SELECT 1
+          FROM usos u
+         WHERE u.obra_id = o.id
+           AND (
+             EXISTS (
+               SELECT 1 FROM usos u2
+                WHERE u2.obra_id = u.obra_id
+                  AND u2.aula_id <> u.aula_id
+             )
+           )
+           AND (
+             u.validado_em IS NULL
+             OR EXISTS (
+               SELECT 1 FROM usos u3
+                WHERE u3.obra_id = u.obra_id
+                  AND u3.aula_id <> u.aula_id
+                  AND u3.atualizado_em > u.validado_em
+             )
+           )
+      )`);
+    }
+
     const where = `WHERE ${condicoes.join(" AND ")}`;
 
     const r = await pool.query(
@@ -912,21 +933,34 @@ app.get("/obras", async (req, res) => {
                   ) sub
               ) AS eixos,
               (
-                SELECT jsonb_object_agg(estado_revisao, total)
-                  FROM (
-                    SELECT estado_revisao, COUNT(*) AS total
-                      FROM usos u
-                     WHERE u.obra_id = o.id
-                     GROUP BY estado_revisao
-                  ) sub2
-              ) AS estados_revisao_contagem,
-              (
                 SELECT e.capa_url
                   FROM edicoes e
                  WHERE e.obra_id = o.id AND e.capa_url IS NOT NULL
                  ORDER BY e.ano DESC NULLS LAST, e.id DESC
                  LIMIT 1
               ) AS capa_url,
+              (
+                SELECT COUNT(*)::int
+                  FROM usos u
+                 WHERE u.obra_id = o.id
+                   AND (
+                     EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id)
+                   )
+                   AND (
+                     u.validado_em IS NULL
+                     OR EXISTS (
+                       SELECT 1 FROM usos u3
+                        WHERE u3.obra_id = u.obra_id
+                          AND u3.aula_id <> u.aula_id
+                          AND u3.atualizado_em > u.validado_em
+                     )
+                   )
+              ) AS usos_a_avaliar,
+              (
+                SELECT COUNT(*)::int
+                  FROM usos u
+                 WHERE u.obra_id = o.id
+              ) AS total_usos,
               EXISTS (
                 SELECT 1
                   FROM usos u
@@ -951,23 +985,11 @@ app.get("/obras", async (req, res) => {
       params
     );
 
-    const obras = r.rows.map((o) => {
-      const estados = o.estados_revisao_contagem || {};
-      const resumoEstados = Object.entries(estados)
-        .map(([estado, total]) => {
-          const rotulo = ROTULO_ESTADO_REVISAO[estado] || estado;
-          const rotuloMinusculo = rotulo.charAt(0).toLowerCase() + rotulo.slice(1);
-          return `${total} ${rotuloMinusculo}`;
-        })
-        .join(", ");
-
-      return {
-        ...o,
-        rotuloTipoMaterial: ROTULO_TIPO_MATERIAL[o.tipo_material] || o.tipo_material,
-        rotuloEstadoVerificacao: ROTULO_ESTADO_VERIFICACAO[o.estado_verificacao] || o.estado_verificacao,
-        resumoEstados
-      };
-    });
+    const obras = r.rows.map((o) => ({
+      ...o,
+      rotuloTipoMaterial: ROTULO_TIPO_MATERIAL[o.tipo_material] || o.tipo_material,
+      rotuloEstadoVerificacao: ROTULO_ESTADO_VERIFICACAO[o.estado_verificacao] || o.estado_verificacao
+    }));
 
     res.render("obras-lista", {
       titulo: "Bibliografia",
@@ -975,9 +997,10 @@ app.get("/obras", async (req, res) => {
       filtros: {
         q: busca,
         tipo: tipoFiltro,
-        estado: estadoFiltro
+        estado: estadoFiltro,
+        avaliacao: avaliacaoFiltro
       },
-      temFiltro: Boolean(busca || tipoFiltro || estadoFiltro),
+      temFiltro: Boolean(busca || tipoFiltro || estadoFiltro || avaliacaoFiltro),
       tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
       estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
     });
@@ -1285,190 +1308,6 @@ app.post("/obras/mesclar", async (req, res) => {
   }
 });
 
-app.get("/obras/:id/decisoes/nova", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const or = await pool.query(
-    "SELECT id, titulo FROM obras WHERE id = $1",
-    [id]
-  );
-  if (or.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
-  const obra = or.rows[0];
-
-  const usosR = await pool.query(
-    `SELECT u.id, u.papel, u.modalidade, u.estado_revisao,
-            a.titulo AS aula_titulo
-       FROM usos u
-       JOIN unidades a ON a.id = u.aula_id
-      WHERE u.obra_id = $1
-      ORDER BY
-        CASE u.papel
-          WHEN 'texto_base' THEN 1
-          WHEN 'texto_complementar' THEN 2
-          WHEN 'ficcao_ancora' THEN 3
-          WHEN 'ficcao_complementar' THEN 4
-          ELSE 5
-        END,
-        a.titulo`,
-    [id]
-  );
-
-  const usos = usosR.rows.map((u) => ({
-    ...u,
-    rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
-    rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
-    rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao
-  }));
-
-  let usosPreSelecionados = [];
-  if (req.query.usos) {
-    usosPreSelecionados = String(req.query.usos)
-      .split(",")
-      .map((s) => Number(s.trim()))
-      .filter((n) => Number.isInteger(n) && n > 0);
-  }
-
-  res.render("decisao-form", {
-    titulo: `Nova Decisão — ${obra.titulo}`,
-    obra,
-    usos,
-    valores: {
-      estado: "repeticao_validada",
-      justificativa: "",
-      usosSelecionados: usosPreSelecionados
-    },
-    erros: [],
-    estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO)
-  });
-});
-
-app.post("/obras/:id/decisoes/nova", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const or = await pool.query(
-    "SELECT id, titulo FROM obras WHERE id = $1",
-    [id]
-  );
-  if (or.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
-  const obra = or.rows[0];
-
-  const estado = String(req.body.estado || "").trim();
-  const justificativa = String(req.body.justificativa || "").trim();
-  const usosSelecionados = [].concat(req.body.usos || [])
-    .map((s) => Number(s))
-    .filter((n) => Number.isInteger(n) && n > 0);
-
-  const erros = [];
-  if (!ROTULO_ESTADO_REVISAO[estado]) erros.push("Estado de revisão inválido.");
-  if (!justificativa) erros.push("A justificativa é obrigatória.");
-  if (usosSelecionados.length === 0) erros.push("Selecione pelo menos um uso.");
-
-  if (usosSelecionados.length > 0) {
-    const vr = await pool.query(
-      "SELECT id FROM usos WHERE id = ANY($1::bigint[]) AND obra_id = $2",
-      [usosSelecionados, id]
-    );
-    if (vr.rows.length !== usosSelecionados.length) {
-      erros.push("Um ou mais usos selecionados não pertencem a esta obra.");
-    }
-  }
-
-  const usosR = await pool.query(
-    `SELECT u.id, u.papel, u.modalidade, u.estado_revisao,
-            a.titulo AS aula_titulo
-       FROM usos u
-       JOIN unidades a ON a.id = u.aula_id
-      WHERE u.obra_id = $1
-      ORDER BY a.titulo`,
-    [id]
-  );
-
-  const usos = usosR.rows.map((u) => ({
-    ...u,
-    rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
-    rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
-    rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao
-  }));
-
-  if (erros.length > 0) {
-    return res.status(400).render("decisao-form", {
-      titulo: `Nova Decisão — ${obra.titulo}`,
-      obra,
-      usos,
-      valores: {
-        estado,
-        justificativa,
-        usosSelecionados
-      },
-      erros,
-      estadosRevisao: Object.entries(ROTULO_ESTADO_REVISAO)
-    });
-  }
-
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-
-    const dR = await client.query(
-      `INSERT INTO decisoes_revisao (obra_id, estado, justificativa)
-       VALUES ($1, $2, $3)
-       RETURNING id`,
-      [id, estado, justificativa]
-    );
-    const decisaoId = dR.rows[0].id;
-
-    for (const usoId of usosSelecionados) {
-      await client.query(
-        "INSERT INTO decisoes_usos (decisao_id, uso_id) VALUES ($1, $2)",
-        [decisaoId, usoId]
-      );
-      await client.query(
-        "UPDATE usos SET estado_revisao = $1, atualizado_em = now() WHERE id = $2",
-        [estado, usoId]
-      );
-    }
-
-    await client.query("COMMIT");
-    res.redirect(`/obras/${id}?salvo=1`);
-  } catch (err) {
-    await client.query("ROLLBACK");
-    console.error("Erro ao criar decisão:", err.message);
-    res.status(500).type("text/plain").send("Erro interno ao salvar. Nada foi gravado.");
-  } finally {
-    client.release();
-  }
-});
-
-app.post("/obras/:id/decisoes/:decisao_id/excluir", async (req, res) => {
-  const id = Number(req.params.id);
-  const decisaoId = Number(req.params.decisao_id);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(decisaoId) || decisaoId <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const r = await pool.query(
-    "SELECT id FROM decisoes_revisao WHERE id = $1 AND obra_id = $2",
-    [decisaoId, id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Decisão não encontrada.");
-  }
-
-  await pool.query("DELETE FROM decisoes_revisao WHERE id = $1", [decisaoId]);
-
-  res.redirect(`/obras/${id}?salvo=1`);
-});
-
 app.get("/obras/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -1492,9 +1331,7 @@ app.get("/obras/:id", async (req, res) => {
   );
 
   const edicoesR = await pool.query(
-    `SELECT id, editora, ano, numero_edicao, traducao, idioma, isbn,
-            link_referencia, observacoes, estado_verificacao, capa_url,
-            criado_em, atualizado_em
+    `SELECT id, editora, ano, capa_url
        FROM edicoes
       WHERE obra_id = $1
       ORDER BY ano NULLS LAST, id`,
@@ -1503,10 +1340,26 @@ app.get("/obras/:id", async (req, res) => {
 
   const usosR = await pool.query(
     `SELECT u.id, u.papel, u.modalidade, u.orientacao, u.observacoes,
-            u.estado_revisao, u.criado_em, u.atualizado_em,
+            u.validado_em, u.criado_em, u.atualizado_em,
             a.id AS aula_id, a.titulo AS aula_titulo, a.codigo AS aula_codigo,
             e.id AS edicao_id, e.editora AS edicao_editora, e.ano AS edicao_ano,
-            e.capa_url AS edicao_capa_url
+            e.capa_url AS edicao_capa_url,
+            (
+              EXISTS (
+                SELECT 1 FROM usos u2
+                 WHERE u2.obra_id = u.obra_id
+                   AND u2.aula_id <> u.aula_id
+              )
+              AND (
+                u.validado_em IS NULL
+                OR EXISTS (
+                  SELECT 1 FROM usos u3
+                   WHERE u3.obra_id = u.obra_id
+                     AND u3.aula_id <> u.aula_id
+                     AND u3.atualizado_em > u.validado_em
+                )
+              )
+            ) AS a_avaliar
        FROM usos u
        JOIN unidades a ON a.id = u.aula_id
        LEFT JOIN edicoes e ON e.id = u.edicao_id
@@ -1569,56 +1422,6 @@ app.get("/obras/:id", async (req, res) => {
   );
   const totalAulasDistintas = totalAulasDistintasR.rows[0].total;
 
-  const decisoesR = await pool.query(
-    `SELECT d.id, d.estado, d.justificativa, d.criado_em
-       FROM decisoes_revisao d
-      WHERE d.obra_id = $1
-      ORDER BY d.criado_em DESC`,
-    [id]
-  );
-
-  const decisoesIds = decisoesR.rows.map((d) => d.id);
-  let usosPorDecisao = {};
-  let usoInfoPorId = {};
-  for (const u of usosR.rows) {
-    usoInfoPorId[u.id] = u;
-  }
-  if (decisoesIds.length > 0) {
-    const dr = await pool.query(
-      `SELECT du.decisao_id, du.uso_id
-         FROM decisoes_usos du
-        WHERE du.decisao_id = ANY($1::bigint[])`,
-      [decisoesIds]
-    );
-    for (const r of dr.rows) {
-      if (!usosPorDecisao[r.decisao_id]) usosPorDecisao[r.decisao_id] = [];
-      usosPorDecisao[r.decisao_id].push(r.uso_id);
-    }
-  }
-
-  const decisoes = decisoesR.rows.map((d) => {
-    const usosIdsDec = usosPorDecisao[d.id] || [];
-    const usosDaDecisao = usosIdsDec
-      .map((uid) => usoInfoPorId[uid])
-      .filter(Boolean);
-
-    const dataDecisao = new Date(d.criado_em);
-    const vencida = usosDaDecisao.some(
-      (u) => new Date(u.atualizado_em) > dataDecisao
-    );
-
-    return {
-      ...d,
-      rotuloEstado: ROTULO_ESTADO_REVISAO[d.estado] || d.estado,
-      usos: usosDaDecisao.map((u) => ({
-        id: u.id,
-        aula_titulo: u.aula_titulo,
-        rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel
-      })),
-      vencida
-    };
-  });
-
   obra.rotuloTipoMaterial = ROTULO_TIPO_MATERIAL[obra.tipo_material] || obra.tipo_material;
   obra.rotuloEstadoVerificacao =
     ROTULO_ESTADO_VERIFICACAO[obra.estado_verificacao] || obra.estado_verificacao;
@@ -1634,8 +1437,9 @@ app.get("/obras/:id", async (req, res) => {
     recortes: recortesPorUso[u.id] || [],
     rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
     rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
-    rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao,
-    caminho: caminhosPorAula[u.aula_id] || ""
+    caminho: caminhosPorAula[u.aula_id] || "",
+    a_avaliar: u.a_avaliar,
+    rotuloEstado: u.a_avaliar ? "A Avaliar" : "Validado"
   }));
 
   const salvo = req.query.salvo === "1";
@@ -1647,7 +1451,6 @@ app.get("/obras/:id", async (req, res) => {
     edicoes,
     usos,
     totalAulasDistintas,
-    decisoes,
     salvo
   });
 });
@@ -1974,64 +1777,6 @@ app.post("/obras/:id/edicoes/:edicao_id/excluir", async (req, res) => {
   res.redirect(`/obras/${id}?salvo=1`);
 });
 
-// ----- Rota: excluir obra -----
-
-app.post("/obras/:id/excluir", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const r = await pool.query(
-    "SELECT id, titulo, arquivada FROM obras WHERE id = $1",
-    [id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
-  const obra = r.rows[0];
-
-  if (obra.arquivada) {
-    return res.status(400).type("text/plain").send("Esta obra já está arquivada.");
-  }
-
-  // Bloqueia se houver usos
-  const usosR = await pool.query(
-    `SELECT a.id, a.titulo
-       FROM usos u
-       JOIN unidades a ON a.id = u.aula_id
-      WHERE u.obra_id = $1
-      ORDER BY a.titulo`,
-    [id]
-  );
-
-  if (usosR.rows.length > 0) {
-    const titulos = usosR.rows.map((u) => `"${u.titulo}"`).join(", ");
-    return res.status(400).type("text/plain").send(
-      `Esta obra está em uso em ${usosR.rows.length} aula(s): ${titulos}. Remova ou reatribua os usos antes de excluir.`
-    );
-  }
-
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-
-    await client.query("DELETE FROM edicoes WHERE obra_id = $1", [id]);
-    await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [id]);
-    await client.query("DELETE FROM decisoes_revisao WHERE obra_id = $1", [id]);
-    await client.query("DELETE FROM obras WHERE id = $1", [id]);
-
-    await client.query("COMMIT");
-    res.redirect("/obras");
-  } catch (err) {
-    await client.query("ROLLBACK");
-    console.error("Erro ao excluir obra:", err.message);
-    res.status(500).type("text/plain").send("Erro interno ao excluir. Nada foi alterado.");
-  } finally {
-    client.release();
-  }
-});
-
 // ----- Rotas de edição de uso (R4) -----
 
 app.get("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
@@ -2220,7 +1965,8 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
         papel, modalidade, orientacao: orientacao || "",
         recortes: recortes.length > 0 ? recortes : [
           { rotulo: "", tipo: "capitulo", observacao: "" }
-        ]
+        ],
+        uso_id: usoId
       },
       erros,
       modo: "editar",
@@ -2463,12 +2209,16 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const usoR = await client.query(
+    await client.query(
       `INSERT INTO usos
-         (aula_id, obra_id, edicao_id, papel, modalidade, orientacao, estado_revisao)
-       VALUES ($1, $2, $3, $4, $5, $6, 'a_avaliar')
-       RETURNING id`,
+         (aula_id, obra_id, edicao_id, papel, modalidade, orientacao)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [id, obra_id, edicao_id, papel, modalidade, orientacao]
+    );
+
+    const usoR = await client.query(
+      "SELECT id FROM usos WHERE aula_id = $1 AND obra_id = $2 ORDER BY id DESC LIMIT 1",
+      [id, obra_id]
     );
     const usoId = usoR.rows[0].id;
 
@@ -2512,7 +2262,117 @@ app.post("/unidades/:id/usos/:uso_id/excluir", async (req, res) => {
   res.redirect(`/unidades/${id}?salvo=1`);
 });
 
+app.post("/unidades/:id/usos/:uso_id/validar", async (req, res) => {
+  const id = Number(req.params.id);
+  const usoId = Number(req.params.uso_id);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(usoId) || usoId <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id FROM usos WHERE id = $1 AND aula_id = $2",
+    [usoId, id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Uso não encontrado.");
+  }
+
+  await pool.query(
+    "UPDATE usos SET validado_em = now() WHERE id = $1",
+    [usoId]
+  );
+
+  res.redirect(`/unidades/${id}?salvo=1`);
+});
+
+app.post("/unidades/:id/usos/:uso_id/reabrir", async (req, res) => {
+  const id = Number(req.params.id);
+  const usoId = Number(req.params.uso_id);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(usoId) || usoId <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id FROM usos WHERE id = $1 AND aula_id = $2",
+    [usoId, id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Uso não encontrado.");
+  }
+
+  await pool.query(
+    "UPDATE usos SET validado_em = NULL WHERE id = $1",
+    [usoId]
+  );
+
+  res.redirect(`/unidades/${id}?salvo=1`);
+});
+
 // ----- Fim das rotas de uso -----
+
+// ----- Rota: fila de revisão -----
+
+app.get("/revisao", async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT o.id, o.titulo,
+              COALESCE(
+                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                   FROM obras_autores oa WHERE oa.obra_id = o.id),
+                ''
+              ) AS autores,
+              (SELECT COUNT(*)::int FROM usos u WHERE u.obra_id = o.id) AS total_usos,
+              (
+                SELECT COUNT(*)::int
+                  FROM usos u
+                 WHERE u.obra_id = o.id
+                   AND (
+                     EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id)
+                   )
+                   AND (
+                     u.validado_em IS NULL
+                     OR EXISTS (
+                       SELECT 1 FROM usos u3
+                        WHERE u3.obra_id = u.obra_id
+                          AND u3.aula_id <> u.aula_id
+                          AND u3.atualizado_em > u.validado_em
+                     )
+                   )
+              ) AS usos_a_avaliar
+         FROM obras o
+        WHERE o.arquivada = false
+          AND EXISTS (
+            SELECT 1
+              FROM usos u
+             WHERE u.obra_id = o.id
+               AND (
+                 EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id)
+               )
+               AND (
+                 u.validado_em IS NULL
+                 OR EXISTS (
+                   SELECT 1 FROM usos u3
+                    WHERE u3.obra_id = u.obra_id
+                      AND u3.aula_id <> u.aula_id
+                      AND u3.atualizado_em > u.validado_em
+                 )
+               )
+          )
+        ORDER BY o.titulo`,
+      []
+    );
+
+    res.render("revisao", {
+      titulo: "Revisão de Usos",
+      obras: r.rows
+    });
+  } catch (err) {
+    console.error("Erro na fila de revisão:", err.message);
+    res.status(500).type("text/plain").send("Erro ao carregar a fila de revisão.");
+  }
+});
+
+// ----- Fim da fila de revisão -----
 
 app.get("/unidades/:id", async (req, res) => {
   const id = Number(req.params.id);
@@ -2563,7 +2423,7 @@ app.get("/unidades/:id", async (req, res) => {
   if (unidade.tipo === "aula") {
     const ua = await pool.query(
       `SELECT u.id, u.obra_id, u.edicao_id, u.papel, u.modalidade,
-              u.orientacao, u.observacoes, u.estado_revisao,
+              u.orientacao, u.observacoes, u.validado_em, u.atualizado_em,
               o.titulo AS obra_titulo,
               COALESCE(
                 (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
@@ -2571,7 +2431,23 @@ app.get("/unidades/:id", async (req, res) => {
                 ''
               ) AS obra_autores,
               e.id AS edicao_id_ref, e.editora AS edicao_editora, e.ano AS edicao_ano,
-              e.capa_url AS edicao_capa_url
+              e.capa_url AS edicao_capa_url,
+              (
+                EXISTS (
+                  SELECT 1 FROM usos u2
+                   WHERE u2.obra_id = u.obra_id
+                     AND u2.aula_id <> u.aula_id
+                )
+                AND (
+                  u.validado_em IS NULL
+                  OR EXISTS (
+                    SELECT 1 FROM usos u3
+                     WHERE u3.obra_id = u.obra_id
+                       AND u3.aula_id <> u.aula_id
+                       AND u3.atualizado_em > u.validado_em
+                  )
+                )
+              ) AS a_avaliar
          FROM usos u
          JOIN obras o ON o.id = u.obra_id
          LEFT JOIN edicoes e ON e.id = u.edicao_id
@@ -2604,13 +2480,15 @@ app.get("/unidades/:id", async (req, res) => {
       }
     }
 
-    usosAula = ua.rows.map((u) => ({
+      usosAula = ua.rows.map((u) => ({
       ...u,
       recortes: recortesPorUso[u.id] || [],
       rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
       rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
-      rotuloEstadoRevisao: ROTULO_ESTADO_REVISAO[u.estado_revisao] || u.estado_revisao
+      a_avaliar: u.a_avaliar,
+      rotuloEstado: u.a_avaliar ? "A Avaliar" : "Validado"
     }));
+ 
   }
 
   let caminhoCurricular = "";

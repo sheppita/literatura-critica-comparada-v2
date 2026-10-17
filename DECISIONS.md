@@ -29,15 +29,15 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D23 | Detecção de conflito impede salvamento silencioso em versão mais antiga | consolidada |
 | D24 | Papéis de uso: texto_base, texto_complementar, ficcao_ancora, ficcao_complementar | consolidada |
 | D25 | Modalidade de uso: integral, parcial | consolidada |
-| D26 | Estados de revisão de uso: a_avaliar, repeticao_validada, substituicao_planejada, resolvida | consolidada |
+| D26 | Estados de revisão de uso: a_avaliar, repeticao_validada, substituicao_planejada, resolvida | substituída por D68–D72 |
 | D27 | Estado de verificação: dois campos separados (obra e edição) | consolidada |
 | D28 | Aula exibe usos e permite editar direto na página | consolidada |
 | D29 | Sem upload de PDF, sem pesquisa automática de ISBN, sem comparação automática de trechos | consolidada |
-| D30 | Fase 3.7 faz decisões de revisão e mesclagem na mesma etapa | consolidada |
+| D30 | Fase 3.7 faz decisões de revisão e mesclagem na mesma etapa | substituída por D72 |
 | D31 | Mesclagem usa arquivamento (obra perdedora não é apagada, fica `arquivada`) | consolidada |
-| D32 | Aviso de decisão possivelmente vencida aparece na página da obra | consolidada |
+| D32 | Aviso de decisão possivelmente vencida aparece na página da obra | substituída por D72 |
 | D33 | Tela de mesclagem em `/obras/mesclar` (tela separada) | consolidada |
-| D34 | Registrar decisão também atualiza o estado de revisão dos usos envolvidos | consolidada |
+| D34 | Registrar decisão também atualiza o estado de revisão dos usos envolvidos | substituída por D72 |
 | D35 | Excluir edição em uso: bloquear com mensagem clara | consolidada |
 | D36 | Excluir edição sem uso: exclusão direta com confirmação | consolidada |
 | D37 | Editar obra: apagar e reinserir os autores | consolidada |
@@ -68,9 +68,17 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D62 | Excluir uso: disponível na tela de editar uso, com confirmação simples. | consolidada |
 | D63 | ISBN removido dos formulários e da exibição (coluna mantida no banco, D54). | consolidada |
 | D64 | Tipos de material: `livro`, `artigo`, `ensaio`, `revista`, `outro`. | consolidada |
-| D65 | Tipos de recorte: `capitulo`, `secao`, `ensaio`, `a_conferir`. | consolidada |
+| D65 | Tipos de recorte: `capitulo`, `secao`, `ensaio`, `a_conferir` | substituída por D75 |
 | D66 | Campos "Início" e "Fim" removidos dos formulários de recorte (colunas mantidas no banco, D54). | consolidada |
 | D67 | Recorte `a_conferir` é o único tipo especial que permanece (sinaliza pendência). `integral` foi removido — a modalidade do uso já expressa "obra integral". | consolidada |
+| D68 | Estado "a avaliar" é **calculado**, não mantido. Um uso está a avaliar se existe outro uso da mesma obra em **outra aula**, e ele não foi validado depois da última alteração de qualquer outro uso. | consolidada |
+| D69 | Coluna `usos.validado_em` (TIMESTAMPTZ). `NULL` = não validado. Data = validado naquele momento. | consolidada |
+| D70 | O uso é **validado individualmente**. Um uso validado não valida os outros. | consolidada |
+| D71 | Se um uso novo da mesma obra é cadastrado, os usos antigos voltam a "a avaliar" automaticamente (pela data, sem UPDATE explícito). | consolidada |
+| D72 | **Removida** a mecânica de decisões de revisão: tabelas `decisoes_revisao` e `decisoes_usos` deletadas, coluna `usos.estado_revisao` deletada, tela "Registrar Decisão" removida, bloco "Decisões de Revisão" removido. | consolidada |
+| D73 | Filtros em cápsula no catálogo: "Todas" / "A Avaliar". | consolidada |
+| D74 | Tela `/revisao` lista obras com usos a avaliar. Link "Revisão" na navbar. | consolidada |
+| D75 | Tipos de recorte: `capitulo`, `secao`, `ensaio`, `conto`, `poema`, `a_conferir`. | consolidada |
 
 ## Regras de trabalho
 
@@ -85,6 +93,7 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 - **R9:** quando houver dúvida entre manter um campo pela spec e remover pela simplicidade do uso, **o uso manda**. YAGNI reverso: construir, ver e remover é melhor que construir enxuto demais e descobrir depois que faltava.
 - **R10:** ao remover uma camada da hierarquia, os dados dessa camada são **arquivados**, não apagados — reversível até que se decida o contrário.
 - **R11:** mudanças em constraints do banco ou migrações de dados merecem atenção redobrada — ordem de operações (migrar antes de alterar constraint) e verificação pós-migração.
+- **R12:** quando o estado de uma entidade é **derivado** de outras (como "a avaliar"), ele deve ser calculado no SQL, não mantido em campo nem replicado em JavaScript. Um cálculo, uma fonte de verdade.
 
 ## Comportamentos conhecidos (não são bugs)
 
@@ -94,9 +103,10 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 
 - O banco do Neon se chama `neondb` dentro do projeto `literatura-critica-comparada-v2`.
 - O protótipo antigo permanece arquivado em repositório separado.
-- Coluna `capa_url` em `edicoes` (adicionada em out/2026).
-- Coluna `arquivada` em `unidades` (adicionada em out/2026).
+- Coluna `capa_url` em `edicoes` (out/2026).
+- Coluna `arquivada` em `unidades` (out/2026).
+- Coluna `validado_em` em `usos` (out/2026).
 - 9 módulos arquivados em `unidades` (`tipo = 'modulo'`, `arquivada = true`).
 - Constraints ativas em `unidades`: `unidades_tipo_check`, `descricao_apenas_em_eixo_disciplina`, `pergunta_norteadora_so_em_tema`.
-- Constraints ativas em `usos_recortes`: `usos_recortes_tipo_check` (`capitulo`, `secao`, `ensaio`, `a_conferir`).
-- Constraints ativas em `obras`: `obras_tipo_material_check` (`livro`, `artigo`, `ensaio`, `revista`, `outro`).
+- Constraint ativa em `usos_recortes`: `usos_recortes_tipo_check` (`capitulo`, `secao`, `ensaio`, `conto`, `poema`, `a_conferir`).
+- Constraint ativa em `obras`: `obras_tipo_material_check` (`livro`, `artigo`, `ensaio`, `revista`, `outro`).

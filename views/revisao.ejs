@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <%- include('./partials/navbar') %>
+
+  <p class="caminho">
+    <a href="/">Início</a> › Revisão de Usos
+  </p>
+
+  <h1>Revisão de Usos</h1>
+  <p class="subtitulo">Obras com usos a avaliar</p>
+
+  <% if (obras.length === 0) { %>
+    <p class="aviso-vazio">
+      Nenhuma obra com usos a avaliar no momento.
+    </p>
+  <% } else { %>
+    <p class="contador-resultados">
+      <%= obras.length %> obra<%= obras.length === 1 ? '' : 's' %>
+      com uso<%= obras.length === 1 ? '' : 's' %> a avaliar.
+    </p>
+
+    <ul class="lista-revisao">
+      <% for (const o of obras) { %>
+        <li class="revisao-item">
+          <a href="/obras/<%= o.id %>">
+            <strong><%= o.titulo %></strong>
+          </a>
+          <% if (o.autores) { %>
+            <span class="detalhe-suave"> — <%= o.autores %></span>
+          <% } %>
+          <div class="detalhe-suave">
+            <%= o.total_usos %> uso<%= o.total_usos === 1 ? '' : 's' %> no total,
+            <strong><%= o.usos_a_avaliar %></strong> a avaliar.
+          </div>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+
+  <%- include('./partials/botoes-flutuantes') %>
+</body>
+</html>

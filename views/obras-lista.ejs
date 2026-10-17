@@ -17,7 +17,22 @@
   <h1>Bibliografia</h1>
   <p class="subtitulo">Catálogo de obras</p>
 
+  <div class="filtros-capsula">
+    <a href="/obras<%= filtros.q ? '?q=' + encodeURIComponent(filtros.q) : '' %>"
+       class="capsula <%= !filtros.avaliacao ? 'capsula-ativa' : '' %>">
+      Todas
+    </a>
+    <a href="/obras?avaliacao=a_avaliar<%= filtros.q ? '&q=' + encodeURIComponent(filtros.q) : '' %>"
+       class="capsula <%= filtros.avaliacao === 'a_avaliar' ? 'capsula-ativa' : '' %>">
+      A Avaliar
+    </a>
+  </div>
+
   <form method="GET" action="/obras" class="filtros-obras">
+    <% if (filtros.avaliacao) { %>
+      <input type="hidden" name="avaliacao" value="<%= filtros.avaliacao %>">
+    <% } %>
+
     <input type="text" name="q" placeholder="Buscar por título ou autoria..."
            value="<%= filtros.q %>">
 
@@ -25,15 +40,6 @@
       <option value="">Todos os tipos</option>
       <% for (const [valor, rotulo] of tiposMaterial) { %>
         <option value="<%= valor %>" <%= filtros.tipo === valor ? 'selected' : '' %>>
-          <%= rotulo %>
-        </option>
-      <% } %>
-    </select>
-
-    <select name="estado">
-      <option value="">Todos os estados</option>
-      <% for (const [valor, rotulo] of estadosVerificacao) { %>
-        <option value="<%= valor %>" <%= filtros.estado === valor ? 'selected' : '' %>>
           <%= rotulo %>
         </option>
       <% } %>
@@ -67,8 +73,7 @@
           <th></th>
           <th>Título / Autoria</th>
           <th>Aparece em</th>
-          <th>Eixos</th>
-          <th>Revisão</th>
+          <th>Avaliação</th>
           <th>Edições</th>
         </tr>
       </thead>
@@ -89,7 +94,7 @@
                 <div class="detalhe-suave"><%= o.autores %></div>
               <% } %>
               <div class="detalhe-suave">
-                <%= o.rotuloTipoMaterial %> · Verificação: <%= o.rotuloEstadoVerificacao %>
+                <%= o.rotuloTipoMaterial %>
               </div>
             </td>
             <td>
@@ -101,15 +106,10 @@
               <% } %>
             </td>
             <td>
-              <% if (o.eixos) { %>
-                <%= o.eixos %>
-              <% } else { %>
-                <span class="detalhe-suave">—</span>
-              <% } %>
-            </td>
-            <td>
-              <% if (o.resumoEstados) { %>
-                <%= o.resumoEstados %>
+              <% if (o.usos_a_avaliar > 0) { %>
+                <span class="chip chip-avaliar"><%= o.usos_a_avaliar %> a avaliar</span>
+              <% } else if (o.total_usos > 0) { %>
+                <span class="chip chip-validado">Validado</span>
               <% } else { %>
                 <span class="detalhe-suave">—</span>
               <% } %>

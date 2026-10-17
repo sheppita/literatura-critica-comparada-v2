@@ -95,7 +95,7 @@
     <% } else { %>
       <ul class="lista-usos-aula">
         <% for (const u of usosAula) { %>
-          <li class="uso-aula-item">
+          <li class="uso-aula-item <%= u.a_avaliar ? 'uso-a-avaliar' : '' %>">
             <div class="uso-com-capa">
               <% if (u.edicao_capa_url) { %>
                 <img src="<%= u.edicao_capa_url %>" alt="" class="miniatura-capa miniatura-capa-uso">
@@ -106,19 +106,14 @@
                     <a href="/obras/<%= u.obra_id %>"><%= u.obra_titulo %></a>
                     <% if (u.obra_autores) { %> — <%= u.obra_autores %><% } %>
                   </span>
-                  <span class="uso-acoes" style="display: flex; gap: 0.4rem;">
-                    <a href="/unidades/<%= unidade.id %>/usos/<%= u.id %>/editar"
-                       class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar</a>
-                    <form method="POST"
-                          action="/unidades/<%= unidade.id %>/usos/<%= u.id %>/excluir"
-                          style="display:inline;"
-                          onsubmit="return confirm('Remover esta obra da aula? A obra em si continua no catálogo.');">
-                      <button type="submit" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Remover</button>
-                    </form>
+                  <span class="uso-acoes">
+                    <span class="chip <%= u.a_avaliar ? 'chip-avaliar' : 'chip-validado' %>">
+                      <%= u.rotuloEstado %>
+                    </span>
                   </span>
                 </div>
                 <div class="detalhe-suave">
-                  <%= u.rotuloPapel %> · <%= u.rotuloModalidade %> · <%= u.rotuloEstadoRevisao %>
+                  <%= u.rotuloPapel %> · <%= u.rotuloModalidade %>
                   <% if (u.edicao_id) { %>
                     · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
                   <% } else { %>
@@ -142,6 +137,26 @@
                 <% if (u.orientacao) { %>
                   <div class="detalhe-suave"><em><%= u.orientacao %></em></div>
                 <% } %>
+                <div class="uso-botoes">
+                  <% if (u.a_avaliar) { %>
+                    <form method="POST" action="/unidades/<%= unidade.id %>/usos/<%= u.id %>/validar" style="display:inline;">
+                      <button type="submit" class="botao-ghost botao-validar">Validar</button>
+                    </form>
+                  <% } else { %>
+                    <form method="POST" action="/unidades/<%= unidade.id %>/usos/<%= u.id %>/reabrir" style="display:inline;"
+                          onsubmit="return confirm('Reabrir este uso para avaliação?');">
+                      <button type="submit" class="botao-ghost botao-reabrir">Reabrir</button>
+                    </form>
+                  <% } %>
+                  <a href="/unidades/<%= unidade.id %>/usos/<%= u.id %>/editar"
+                     class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Editar</a>
+                  <form method="POST"
+                        action="/unidades/<%= unidade.id %>/usos/<%= u.id %>/excluir"
+                        style="display:inline;"
+                        onsubmit="return confirm('Remover esta obra da aula? A obra em si continua no catálogo.');">
+                    <button type="submit" class="botao-ghost" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">Remover</button>
+                  </form>
+                </div>
               </div>
             </div>
           </li>

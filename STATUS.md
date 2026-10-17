@@ -2,7 +2,7 @@
 
 ## Fase atual
 
-Pacote 2 de melhorias pós-uso — rodadas R1 a R5.4, R8 e R9 concluídas.
+Pacote 2 de melhorias pós-uso — rodadas R1 a R5.4, R8, R9 e R10 concluídas.
 Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito lado a lado).
 
 ## Concluído
@@ -11,21 +11,19 @@ Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito la
 - Repositório, banco Neon, serviço Render, VS Code, rota /health.
 
 ### Fase 1 — Estrutura curricular
-- Tabela `unidades`; hierarquia Eixo → Disciplina → Módulo → Tema → Aula (depois simplificada na R8).
+- Tabela `unidades`; hierarquia (depois simplificada na R8).
 
 ### Pacote 1 de correções pós-uso (Blocos A/B/C)
 - Links na paleta, botão Cancelar fantasma, concordância nominal, banner,
-  favicon, Title Case, descrição fora de tema e aula (constraint no banco).
+  favicon, Title Case, descrição fora de tema e aula.
 
 ### Fase 2 — Fichas de aula
 - Tabelas `fichas` e `fichas_versoes`; editor Markdown com pré-visualização;
-  estados separados (texto e bibliografia); histórico de versões; restauração;
-  detecção de conflito.
+  estados; histórico; restauração; detecção de conflito.
 
 ### Fase 3 — Bibliografia
 - Tabelas `obras`, `obras_autores`, `edicoes`, `usos`, `usos_recortes`;
-  catálogo com busca; página de obra; associação obra↔aula; recortes;
-  decisões de revisão; mesclagem de duplicatas.
+  catálogo com busca; página de obra; associação obra↔aula; recortes.
 
 ### Pacote 2 de melhorias pós-uso
 
@@ -36,22 +34,22 @@ Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito la
 - **R5.1** — Barra fixa no topo; botões flutuantes; migration `capa_url`; banner removido.
 - **R5.2** — Tela "+ Aula"; ordenação de usos por papel; caminho curricular em cada uso;
   "não informado" explícito; omissão do tipo; "+ Nova Obra" no topo do catálogo.
-- **R5.3** — Campo "URL da capa" em edições; exibição da capa em obra, aula e catálogo;
+- **R5.3** — Campo "URL da capa"; exibição da capa em obra, aula e catálogo;
   texto da ficha justificado em telas largas.
-- **R5.4** — Bug #4 (capa_url em Nova Obra); Bug #5 (comparação de tipos em uso);
-  Bug #6 (aviso "Sair do site?" ao salvar ficha); simplificação dos formulários.
-- **R8** — Remoção do nível "Módulo":
-  - R8.1 Diagnóstico + backup
-  - R8.2 Migração: 30 temas remanejados para disciplina; 9 módulos arquivados
-  - R8.3 Constraints ajustadas
-  - R8.4 `server.js` atualizado
-  - R8.5 Botão "+ Aula" removido; rota `/aulas/nova` e template removidos
+- **R5.4** — Bug #4, #5, #6; simplificação dos formulários.
+- **R8** — Remoção do nível "Módulo": 30 temas remanejados, 9 módulos arquivados,
+  constraints ajustadas, botão "+ Aula" e rota `/aulas/nova` removidos.
 - **R9** — Ajustes finos da bibliografia:
-  - #24 Excluir obra (bloqueia se em uso)
-  - #25 Excluir uso na tela de editar uso
-  - #26 ISBN removido dos formulários e da exibição
-  - #27 Tipos de material: Livro, Artigo, Ensaio, Revista, Outro
-  - #28 Recortes simplificados: sem início/fim; tipos Capítulo, Seção, Ensaio, A Conferir
+  - Excluir obra (bloqueia se em uso), excluir uso na tela de edição
+  - ISBN removido dos formulários e da exibição
+  - Tipos de material: Livro, Artigo, Ensaio, Revista, Outro
+  - Recortes simplificados: sem início/fim; tipos Capítulo, Seção, Ensaio, A Conferir
+- **R10** — Reformulação da mecânica de avaliação de usos:
+  - #29 Grid dos campos de recorte corrigido
+  - #30 Tipos de recorte: adicionados Conto e Poema
+  - #31 Estado "a avaliar" calculado em SQL; validação individual por uso;
+    reabertura automática ao cadastrar novo uso; filtros em cápsula no catálogo;
+    tela `/revisao`; exclusão das tabelas de decisões e da coluna `estado_revisao`
 
 ## Em andamento
 
@@ -67,14 +65,12 @@ Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito la
 ## Pendências anotadas
 
 - **Item #6** — Editor de ficha lento e com atritos. Aguardando anotações específicas.
-- **Tela de decisões de revisão** — mantida (uso futuro previsto).
 - **Estados da ficha** — em observação pela usuária.
 
 ## Onde paramos
 
-Hierarquia curricular simplificada (Eixo → Disciplina → Tema → Aula).
-Bibliografia ajustada com tipos de material e recortes coerentes com o uso real.
-Próxima rodada: R6.
+Mecânica de avaliação reformulada: estado calculado, validação individual,
+fila de revisão. Próxima rodada: R6.
 
 ## Registros de incidentes
 
