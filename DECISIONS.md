@@ -6,7 +6,7 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 |---|---|---|
 | D1 | Hierarquia curricular: Eixo → Disciplina → Módulo → Tema → Aula | substituída por D55 |
 | D2 | Leitura pública; edição exige login | consolidada |
-| D3 | Editor de ficha: Markdown + pré-visualização + botões de formatação | consolidada |
+| D3 | Editor de ficha: Markdown + pré-visualização + botões de formatação | substituída por D76 |
 | D4 | Começar por Fase 0 + Fase 1 | consolidada |
 | D5 | Reconstrução do zero, sem herdar código do protótipo | consolidada |
 | D6 | Repositório e serviço novos; troca de nomes no fim | consolidada |
@@ -22,7 +22,7 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D16 | Títulos digitados pela usuária não são capitalizados pelo sistema. Title Case só nos rótulos gerados. | consolidada |
 | D17 | Tabelas `fichas` e `fichas_versoes` (1-para-1 com aula) | consolidada |
 | D18 | Toda aula tem ficha em branco desde a criação | consolidada |
-| D19 | Pré-visualização por botão (Markdown processado no servidor) | consolidada |
+| D19 | Pré-visualização por botão (Markdown processado no servidor) | substituída por D76 |
 | D20 | Ficha integrada na página da aula (não é tela separada) | consolidada |
 | D21 | Fase 2 dividida em 7 etapas (2.1 a 2.7) | consolidada |
 | D22 | Restauração cria nova versão no histórico (linha do tempo preservada) | consolidada |
@@ -70,15 +70,19 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 | D64 | Tipos de material: `livro`, `artigo`, `ensaio`, `revista`, `outro`. | consolidada |
 | D65 | Tipos de recorte: `capitulo`, `secao`, `ensaio`, `a_conferir` | substituída por D75 |
 | D66 | Campos "Início" e "Fim" removidos dos formulários de recorte (colunas mantidas no banco, D54). | consolidada |
-| D67 | Recorte `a_conferir` é o único tipo especial que permanece (sinaliza pendência). `integral` foi removido — a modalidade do uso já expressa "obra integral". | consolidada |
-| D68 | Estado "a avaliar" é **calculado**, não mantido. Um uso está a avaliar se existe outro uso da mesma obra em **outra aula**, e ele não foi validado depois da última alteração de qualquer outro uso. | consolidada |
-| D69 | Coluna `usos.validado_em` (TIMESTAMPTZ). `NULL` = não validado. Data = validado naquele momento. | consolidada |
-| D70 | O uso é **validado individualmente**. Um uso validado não valida os outros. | consolidada |
-| D71 | Se um uso novo da mesma obra é cadastrado, os usos antigos voltam a "a avaliar" automaticamente (pela data, sem UPDATE explícito). | consolidada |
-| D72 | **Removida** a mecânica de decisões de revisão: tabelas `decisoes_revisao` e `decisoes_usos` deletadas, coluna `usos.estado_revisao` deletada, tela "Registrar Decisão" removida, bloco "Decisões de Revisão" removido. | consolidada |
+| D67 | Recorte `a_conferir` é o único tipo especial que permanece. `integral` foi removido. | consolidada |
+| D68 | Estado "a avaliar" é **calculado**, não mantido. | consolidada |
+| D69 | Coluna `usos.validado_em` (TIMESTAMPTZ). `NULL` = não validado. | consolidada |
+| D70 | O uso é **validado individualmente**. | consolidada |
+| D71 | Se um uso novo da mesma obra é cadastrado, os usos antigos voltam a "a avaliar" automaticamente. | consolidada |
+| D72 | **Removida** a mecânica de decisões de revisão. | consolidada |
 | D73 | Filtros em cápsula no catálogo: "Todas" / "A Avaliar". | consolidada |
 | D74 | Tela `/revisao` lista obras com usos a avaliar. Link "Revisão" na navbar. | consolidada |
 | D75 | Tipos de recorte: `capitulo`, `secao`, `ensaio`, `conto`, `poema`, `a_conferir`. | consolidada |
+| D76 | Editor de ficha: **Quill** (WYSIWYG), via CDN. Substitui Markdown + textarea + pré-visualização. | consolidada |
+| D77 | Fichas armazenadas em **HTML** (`fichas.conteudo_html`, `fichas_versoes.conteudo_html`). Markdown antigo convertido. | consolidada |
+| D78 | Estados de ficha (`estado_texto`, `estado_bibliografia`) saem da interface. Colunas mantidas no banco. | consolidada |
+| D79 | Faixa de versão mostra "vN · Editada em DD/MM/AAAA", sem chips de estado. | consolidada |
 
 ## Regras de trabalho
 
@@ -90,14 +94,15 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 - **R6:** quando o volume crescer, o padrão de "busca com autocomplete no servidor" substitui os `<select>` com listas grandes.
 - **R7:** arquivos de código são enviados **inteiros**, sempre. Exceções: `estilo.css` (aditivo) e SQL (executado por comando). A preferência da usuária é o padrão.
 - **R8:** perguntar à usuária antes de dividir arquivo grande em trechos. A decisão de receber inteiro ou em pedaços é dela.
-- **R9:** quando houver dúvida entre manter um campo pela spec e remover pela simplicidade do uso, **o uso manda**. YAGNI reverso: construir, ver e remover é melhor que construir enxuto demais e descobrir depois que faltava.
-- **R10:** ao remover uma camada da hierarquia, os dados dessa camada são **arquivados**, não apagados — reversível até que se decida o contrário.
-- **R11:** mudanças em constraints do banco ou migrações de dados merecem atenção redobrada — ordem de operações (migrar antes de alterar constraint) e verificação pós-migração.
-- **R12:** quando o estado de uma entidade é **derivado** de outras (como "a avaliar"), ele deve ser calculado no SQL, não mantido em campo nem replicado em JavaScript. Um cálculo, uma fonte de verdade.
+- **R9:** quando houver dúvida entre manter um campo pela spec e remover pela simplicidade do uso, **o uso manda**. YAGNI reverso.
+- **R10:** ao remover uma camada da hierarquia, os dados dessa camada são **arquivados**, não apagados.
+- **R11:** mudanças em constraints do banco ou migrações de dados merecem atenção redobrada.
+- **R12:** quando o estado de uma entidade é derivado, ele deve ser calculado no SQL.
+- **R13:** quando uma dependência externa for introduzida (CDN), registrar o motivo e o risco de indisponibilidade.
 
 ## Comportamentos conhecidos (não são bugs)
 
-- O aviso "Sair do site?" (`beforeunload`) é suprimido por navegadores em alguns casos, como cliques em links da mesma origem. Não é falha do código; é limitação do navegador.
+- O aviso "Sair do site?" (`beforeunload`) é suprimido por navegadores em alguns casos, como cliques em links da mesma origem. É limitação do navegador.
 
 ## Observações
 
@@ -106,7 +111,9 @@ Registro curto das decisões consolidadas. Atualizar quando uma decisão mudar.
 - Coluna `capa_url` em `edicoes` (out/2026).
 - Coluna `arquivada` em `unidades` (out/2026).
 - Coluna `validado_em` em `usos` (out/2026).
+- Coluna `conteudo_html` em `fichas` e `fichas_versoes` (out/2026). `conteudo_markdown` em `fichas` mantida como legado.
 - 9 módulos arquivados em `unidades` (`tipo = 'modulo'`, `arquivada = true`).
 - Constraints ativas em `unidades`: `unidades_tipo_check`, `descricao_apenas_em_eixo_disciplina`, `pergunta_norteadora_so_em_tema`.
 - Constraint ativa em `usos_recortes`: `usos_recortes_tipo_check` (`capitulo`, `secao`, `ensaio`, `conto`, `poema`, `a_conferir`).
 - Constraint ativa em `obras`: `obras_tipo_material_check` (`livro`, `artigo`, `ensaio`, `revista`, `outro`).
+- Dependências externas: Google Fonts (Quicksand), jsDelivr CDN (Quill).

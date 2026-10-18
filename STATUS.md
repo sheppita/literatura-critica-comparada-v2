@@ -2,7 +2,7 @@
 
 ## Fase atual
 
-Pacote 2 de melhorias pós-uso — rodadas R1 a R5.4, R8, R9 e R10 concluídas.
+Pacote 2 de melhorias pós-uso — rodadas R1 a R5.4, R8, R9, R10 e R11 concluídas.
 Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito lado a lado).
 
 ## Concluído
@@ -18,8 +18,7 @@ Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito la
   favicon, Title Case, descrição fora de tema e aula.
 
 ### Fase 2 — Fichas de aula
-- Tabelas `fichas` e `fichas_versoes`; editor Markdown com pré-visualização;
-  estados; histórico; restauração; detecção de conflito.
+- Tabelas `fichas` e `fichas_versoes`; histórico; restauração; detecção de conflito.
 
 ### Fase 3 — Bibliografia
 - Tabelas `obras`, `obras_autores`, `edicoes`, `usos`, `usos_recortes`;
@@ -28,28 +27,24 @@ Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito la
 ### Pacote 2 de melhorias pós-uso
 
 - **R1** — Bug #1 (recortes não salvavam).
-- **R2** — Bug #3 (observação do recorte), F5, F6, F4.
-- **R3** — F1 (preservar texto em conflito), F2 (salvamento atômico), F3 (transações).
-- **R4** — Editar obra, adicionar/editar/excluir edições, editar uso.
-- **R5.1** — Barra fixa no topo; botões flutuantes; migration `capa_url`; banner removido.
-- **R5.2** — Tela "+ Aula"; ordenação de usos por papel; caminho curricular em cada uso;
-  "não informado" explícito; omissão do tipo; "+ Nova Obra" no topo do catálogo.
-- **R5.3** — Campo "URL da capa"; exibição da capa em obra, aula e catálogo;
-  texto da ficha justificado em telas largas.
-- **R5.4** — Bug #4, #5, #6; simplificação dos formulários.
-- **R8** — Remoção do nível "Módulo": 30 temas remanejados, 9 módulos arquivados,
-  constraints ajustadas, botão "+ Aula" e rota `/aulas/nova` removidos.
-- **R9** — Ajustes finos da bibliografia:
-  - Excluir obra (bloqueia se em uso), excluir uso na tela de edição
-  - ISBN removido dos formulários e da exibição
-  - Tipos de material: Livro, Artigo, Ensaio, Revista, Outro
-  - Recortes simplificados: sem início/fim; tipos Capítulo, Seção, Ensaio, A Conferir
+- **R2** — Bug #3, F5, F6, F4.
+- **R3** — F1, F2, F3.
+- **R4** — Editar obra, edições, uso.
+- **R5.1** — Barra fixa; botões flutuantes; `capa_url`; banner removido.
+- **R5.2** — Tela "+ Aula"; ordenação por papel; caminho curricular; "não informado";
+  omissão do tipo; "+ Nova Obra" no topo.
+- **R5.3** — Capa por URL; texto justificado.
+- **R5.4** — Bugs #4, #5, #6; simplificação dos formulários.
+- **R8** — Remoção do nível "Módulo"; arquivamento; rota `/aulas/nova` removida.
+- **R9** — Excluir obra e uso; ISBN removido; tipos de material ajustados;
+  recortes simplificados.
 - **R10** — Reformulação da mecânica de avaliação de usos:
-  - #29 Grid dos campos de recorte corrigido
-  - #30 Tipos de recorte: adicionados Conto e Poema
-  - #31 Estado "a avaliar" calculado em SQL; validação individual por uso;
-    reabertura automática ao cadastrar novo uso; filtros em cápsula no catálogo;
-    tela `/revisao`; exclusão das tabelas de decisões e da coluna `estado_revisao`
+  estado calculado em SQL; validação individual; reabertura automática;
+  filtros em cápsula; tela `/revisao`; exclusão das tabelas de decisões.
+- **R11** — Editor Quill:
+  - R11.1 Conversão de 57 fichas e versões de Markdown para HTML.
+  - R11.2 `server.js` lê/grava `conteudo_html`; `ficha-editor.ejs` com Quill;
+    faixa "vN · Editada em DD/MM/AAAA"; estados de ficha removidos da interface.
 
 ## Em andamento
 
@@ -57,20 +52,19 @@ Próximas rodadas: R6 (autocomplete, comparação de recortes) e R7 (conflito la
 
 ## Próximo
 
-- **R6** — Autocomplete no servidor para selects grandes (obras, autores);
-  visão comparativa de recortes entre usos; deixar claro que o formulário
-  permite múltiplos recortes.
+- **R6** — Autocomplete no servidor para selects grandes; visão comparativa
+  de recortes entre usos.
 - **R7** — Tela de comparação lado a lado em conflito de versão.
 
 ## Pendências anotadas
 
-- **Item #6** — Editor de ficha lento e com atritos. Aguardando anotações específicas.
-- **Estados da ficha** — em observação pela usuária.
+- **Item #6** — Editor de ficha lento e com atritos. **Observação:** o Quill
+  provavelmente resolve a maior parte; aguardando uso real para confirmar.
+- **Estados da ficha** — removidos da interface (R11).
 
 ## Onde paramos
 
-Mecânica de avaliação reformulada: estado calculado, validação individual,
-fila de revisão. Próxima rodada: R6.
+Editor de ficha migrado para Quill. Fichas em HTML. Próxima rodada: R6.
 
 ## Registros de incidentes
 

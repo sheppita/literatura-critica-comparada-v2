@@ -1011,3 +1011,64 @@ body {
 .revisao-item a:hover {
   color: var(--terracota);
 }
+
+/* Faixa de versão acima do editor */
+.faixa-versao {
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+  margin-bottom: 0.75rem;
+  font-weight: 500;
+}
+
+/* Editor Quill */
+#editor-quill {
+  background: #fffdf7;
+  border: 1px solid #d8c9a8;
+  border-radius: 6px;
+  min-height: 28rem;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+#editor-quill .ql-editor {
+  min-height: 28rem;
+  padding: 1rem;
+}
+#editor-quill .ql-editor:focus {
+  outline: none;
+}
+
+/* Ajustes do Quill para combinar com a paleta */
+.ql-toolbar.ql-snow {
+  border: 1px solid #d8c9a8;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--creme-escuro);
+  font-family: inherit;
+}
+.ql-container.ql-snow {
+  border: none;
+}
+.ql-snow .ql-stroke {
+  stroke: var(--marrom);
+}
+.ql-snow .ql-fill {
+  fill: var(--marrom);
+}
+.ql-snow .ql-picker {
+  color: var(--marrom);
+}
+.ql-editor blockquote {
+  border-left: 4px solid var(--mostarda);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--texto-suave);
+}
+.ql-editor h2 {
+  font-size: 1.3rem;
+  color: var(--marrom);
+}
+.ql-editor h3 {
+  font-size: 1.1rem;
+  color: var(--marrom);
+}

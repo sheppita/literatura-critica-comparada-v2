@@ -3,7 +3,6 @@ import express from "express";
 import pg from "pg";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { marked } from "marked";
 
 const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -54,6 +53,8 @@ const NOME_FILHO_PLURAL = {
 
 const TIPOS_COM_DESCRICAO = ["eixo", "disciplina"];
 
+// Mantidos para compatibilidade com o histórico de versões antigas.
+// Não são mais editáveis no formulário de ficha.
 const ROTULO_ESTADO_TEXTO = {
   rascunho: "Rascunho",
   em_revisao: "Em Revisão",
@@ -480,7 +481,7 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
   }
 
   const fr = await pool.query(
-    `SELECT id, conteudo_markdown, estado_texto, estado_bibliografia, versao_atual
+    `SELECT id, conteudo_html, versao_atual
        FROM fichas WHERE aula_id = $1`,
     [id]
   );
@@ -505,13 +506,9 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
     ficha,
     cadeia,
     valores: {
-      conteudo_markdown: ficha.conteudo_markdown,
-      estado_texto: ficha.estado_texto,
-      estado_bibliografia: ficha.estado_bibliografia
+      conteudo_html: ficha.conteudo_html || ""
     },
     erros: [],
-    estadosTexto: Object.entries(ROTULO_ESTADO_TEXTO),
-    estadosBibliografia: Object.entries(ROTULO_ESTADO_BIBLIOGRAFIA),
     conflito
   });
 });
@@ -534,18 +531,14 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     return res.status(400).type("text/plain").send("Só aulas têm ficha.");
   }
 
-  const conteudo_markdown = String(req.body.conteudo_markdown || "");
-  const estado_texto = String(req.body.estado_texto || "rascunho");
-  const estado_bibliografia = String(req.body.estado_bibliografia || "pendente");
+  const conteudo_html = String(req.body.conteudo_html || "");
   const versaoQueAbri = Number(req.body.versao_que_abri) || 0;
   const forcar = String(req.body.forcar || "") === "1";
 
   const erros = [];
-  if (!ROTULO_ESTADO_TEXTO[estado_texto]) erros.push("Estado do texto inválido.");
-  if (!ROTULO_ESTADO_BIBLIOGRAFIA[estado_bibliografia]) erros.push("Estado da bibliografia inválido.");
 
   const fr = await pool.query(
-    `SELECT id, conteudo_markdown, estado_texto, estado_bibliografia, versao_atual
+    `SELECT id, conteudo_html, versao_atual
        FROM fichas WHERE aula_id = $1`,
     [id]
   );
@@ -562,13 +555,9 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
       ficha: ficha || { versao_atual: 1 },
       cadeia,
       valores: {
-        conteudo_markdown,
-        estado_texto,
-        estado_bibliografia
+        conteudo_html
       },
       erros: mensagens,
-      estadosTexto: Object.entries(ROTULO_ESTADO_TEXTO),
-      estadosBibliografia: Object.entries(ROTULO_ESTADO_BIBLIOGRAFIA),
       conflito: conflitoAtivo
     });
   }
@@ -584,10 +573,7 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     });
   }
 
-  const mudou =
-    ficha.conteudo_markdown !== conteudo_markdown ||
-    ficha.estado_texto !== estado_texto ||
-    ficha.estado_bibliografia !== estado_bibliografia;
+  const mudou = ficha.conteudo_html !== conteudo_html;
 
   if (!mudou) {
     return res.redirect(`/unidades/${id}?salvo=0`);
@@ -599,15 +585,13 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
 
     const updateR = await client.query(
       `UPDATE fichas
-          SET conteudo_markdown = $1,
-              estado_texto = $2,
-              estado_bibliografia = $3,
+          SET conteudo_html = $1,
               versao_atual = versao_atual + 1,
               atualizado_em = now()
-        WHERE id = $4
-          AND ($5::boolean = true OR versao_atual = $6)
+        WHERE id = $2
+          AND ($3::boolean = true OR versao_atual = $4)
         RETURNING versao_atual`,
-      [conteudo_markdown, estado_texto, estado_bibliografia, ficha.id, forcar, ficha.versao_atual]
+      [conteudo_html, ficha.id, forcar, ficha.versao_atual]
     );
 
     if (updateR.rows.length === 0) {
@@ -628,9 +612,9 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
 
     await client.query(
       `INSERT INTO fichas_versoes
-         (ficha_id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia, motivo)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [ficha.id, novaVersao, conteudo_markdown, estado_texto, estado_bibliografia, motivo]
+         (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia)
+       VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
+      [ficha.id, novaVersao, conteudo_html, motivo]
     );
 
     await client.query("COMMIT");
@@ -645,12 +629,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
   } finally {
     client.release();
   }
-});
-
-app.post("/unidades/:id/ficha/preview", async (req, res) => {
-  const conteudo = String(req.body.conteudo_markdown || "");
-  const html = conteudo.trim() ? marked.parse(conteudo) : "<p><em>(vazio)</em></p>";
-  res.type("text/html").send(html);
 });
 
 app.get("/unidades/:id/ficha/versoes", async (req, res) => {
@@ -681,8 +659,8 @@ app.get("/unidades/:id/ficha/versoes", async (req, res) => {
   const ficha = fr.rows[0];
 
   const versoesR = await pool.query(
-    `SELECT id, numero_versao, estado_texto, estado_bibliografia, motivo, criado_em,
-            LENGTH(conteudo_markdown) AS tamanho
+    `SELECT id, numero_versao, motivo, criado_em,
+            LENGTH(conteudo_html) AS tamanho
        FROM fichas_versoes
       WHERE ficha_id = $1
       ORDER BY numero_versao DESC`,
@@ -691,18 +669,12 @@ app.get("/unidades/:id/ficha/versoes", async (req, res) => {
 
   const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
 
-  const versoes = versoesR.rows.map((v) => ({
-    ...v,
-    rotuloEstadoTexto: ROTULO_ESTADO_TEXTO[v.estado_texto] || v.estado_texto,
-    rotuloEstadoBibliografia: ROTULO_ESTADO_BIBLIOGRAFIA[v.estado_bibliografia] || v.estado_bibliografia
-  }));
-
   res.render("ficha-versoes", {
     titulo: `Histórico — ${unidade.titulo}`,
     unidade,
     ficha,
     cadeia,
-    versoes
+    versoes: versoesR.rows
   });
 });
 
@@ -735,8 +707,7 @@ app.get("/unidades/:id/ficha/versoes/:numero", async (req, res) => {
   const ficha = fr.rows[0];
 
   const vr = await pool.query(
-    `SELECT id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia,
-            motivo, criado_em
+    `SELECT id, numero_versao, conteudo_html, motivo, criado_em
        FROM fichas_versoes
       WHERE ficha_id = $1 AND numero_versao = $2`,
     [ficha.id, numero]
@@ -747,13 +718,6 @@ app.get("/unidades/:id/ficha/versoes/:numero", async (req, res) => {
   const versao = vr.rows[0];
 
   const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
-
-  versao.conteudo_html = versao.conteudo_markdown.trim()
-    ? marked.parse(versao.conteudo_markdown)
-    : null;
-  versao.rotuloEstadoTexto = ROTULO_ESTADO_TEXTO[versao.estado_texto] || versao.estado_texto;
-  versao.rotuloEstadoBibliografia =
-    ROTULO_ESTADO_BIBLIOGRAFIA[versao.estado_bibliografia] || versao.estado_bibliografia;
 
   res.render("ficha-versao", {
     titulo: `Versão v${versao.numero_versao} — ${unidade.titulo}`,
@@ -792,7 +756,7 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
   const ficha = fr.rows[0];
 
   const vr = await pool.query(
-    `SELECT numero_versao, conteudo_markdown, estado_texto, estado_bibliografia
+    `SELECT numero_versao, conteudo_html
        FROM fichas_versoes
       WHERE ficha_id = $1 AND numero_versao = $2`,
     [ficha.id, numero]
@@ -808,28 +772,24 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
 
     const updateR = await client.query(
       `UPDATE fichas
-          SET conteudo_markdown = $1,
-              estado_texto = $2,
-              estado_bibliografia = $3,
+          SET conteudo_html = $1,
               versao_atual = versao_atual + 1,
               atualizado_em = now()
-        WHERE id = $4
+        WHERE id = $2
         RETURNING versao_atual`,
-      [versao.conteudo_markdown, versao.estado_texto, versao.estado_bibliografia, ficha.id]
+      [versao.conteudo_html, ficha.id]
     );
 
     const novaVersao = updateR.rows[0].versao_atual;
 
     await client.query(
       `INSERT INTO fichas_versoes
-         (ficha_id, numero_versao, conteudo_markdown, estado_texto, estado_bibliografia, motivo)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+         (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia)
+       VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
       [
         ficha.id,
         novaVersao,
-        versao.conteudo_markdown,
-        versao.estado_texto,
-        versao.estado_bibliografia,
+        versao.conteudo_html,
         `Restauração da v${versao.numero_versao}`
       ]
     );
@@ -884,7 +844,6 @@ app.get("/obras", async (req, res) => {
 
     condicoes.push(`o.arquivada = false`);
 
-    // Filtro de avaliação
     if (avaliacaoFiltro === "a_avaliar") {
       condicoes.push(`EXISTS (
         SELECT 1
@@ -920,18 +879,6 @@ app.get("/obras", async (req, res) => {
               ) AS autores,
               (SELECT COUNT(*) FROM edicoes e WHERE e.obra_id = o.id) AS total_edicoes,
               (SELECT COUNT(DISTINCT u.aula_id) FROM usos u WHERE u.obra_id = o.id) AS total_aulas_distintas,
-              (
-                SELECT STRING_AGG(DISTINCT titulo_eixo, ' · ')
-                  FROM (
-                    SELECT COALESCE(eixo.titulo, 'Sem eixo') AS titulo_eixo
-                      FROM usos u
-                      JOIN unidades aula ON aula.id = u.aula_id
-                      LEFT JOIN unidades tema ON tema.id = aula.superior_id
-                      LEFT JOIN unidades disciplina ON disciplina.id = tema.superior_id
-                      LEFT JOIN unidades eixo ON eixo.id = disciplina.superior_id
-                     WHERE u.obra_id = o.id
-                  ) sub
-              ) AS eixos,
               (
                 SELECT e.capa_url
                   FROM edicoes e
@@ -1777,6 +1724,60 @@ app.post("/obras/:id/edicoes/:edicao_id/excluir", async (req, res) => {
   res.redirect(`/obras/${id}?salvo=1`);
 });
 
+app.post("/obras/:id/excluir", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const r = await pool.query(
+    "SELECT id, titulo, arquivada FROM obras WHERE id = $1",
+    [id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Obra não encontrada.");
+  }
+  const obra = r.rows[0];
+
+  if (obra.arquivada) {
+    return res.status(400).type("text/plain").send("Esta obra já está arquivada.");
+  }
+
+  const usosR = await pool.query(
+    `SELECT a.id, a.titulo
+       FROM usos u
+       JOIN unidades a ON a.id = u.aula_id
+      WHERE u.obra_id = $1
+      ORDER BY a.titulo`,
+    [id]
+  );
+
+  if (usosR.rows.length > 0) {
+    const titulos = usosR.rows.map((u) => `"${u.titulo}"`).join(", ");
+    return res.status(400).type("text/plain").send(
+      `Esta obra está em uso em ${usosR.rows.length} aula(s): ${titulos}. Remova ou reatribua os usos antes de excluir.`
+    );
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    await client.query("DELETE FROM edicoes WHERE obra_id = $1", [id]);
+    await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [id]);
+    await client.query("DELETE FROM obras WHERE id = $1", [id]);
+
+    await client.query("COMMIT");
+    res.redirect("/obras");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao excluir obra:", err.message);
+    res.status(500).type("text/plain").send("Erro interno ao excluir. Nada foi alterado.");
+  } finally {
+    client.release();
+  }
+});
+
 // ----- Rotas de edição de uso (R4) -----
 
 app.get("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
@@ -2310,8 +2311,6 @@ app.post("/unidades/:id/usos/:uso_id/reabrir", async (req, res) => {
 
 // ----- Fim das rotas de uso -----
 
-// ----- Rota: fila de revisão -----
-
 app.get("/revisao", async (req, res) => {
   try {
     const r = await pool.query(
@@ -2372,8 +2371,6 @@ app.get("/revisao", async (req, res) => {
   }
 });
 
-// ----- Fim da fila de revisão -----
-
 app.get("/unidades/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -2400,22 +2397,13 @@ app.get("/unidades/:id", async (req, res) => {
   let ficha = null;
   if (unidade.tipo === "aula") {
     const fr = await pool.query(
-      `SELECT id, conteudo_markdown, estado_texto, estado_bibliografia,
-              versao_atual, criado_em, atualizado_em
+      `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em
          FROM fichas
         WHERE aula_id = $1`,
       [id]
     );
     if (fr.rows.length > 0) {
-      const f = fr.rows[0];
-      ficha = {
-        ...f,
-        conteudo_html: f.conteudo_markdown.trim()
-          ? marked.parse(f.conteudo_markdown)
-          : null,
-        rotuloEstadoTexto: ROTULO_ESTADO_TEXTO[f.estado_texto],
-        rotuloEstadoBibliografia: ROTULO_ESTADO_BIBLIOGRAFIA[f.estado_bibliografia]
-      };
+      ficha = fr.rows[0];
     }
   }
 
@@ -2480,7 +2468,7 @@ app.get("/unidades/:id", async (req, res) => {
       }
     }
 
-      usosAula = ua.rows.map((u) => ({
+    usosAula = ua.rows.map((u) => ({
       ...u,
       recortes: recortesPorUso[u.id] || [],
       rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
@@ -2488,7 +2476,6 @@ app.get("/unidades/:id", async (req, res) => {
       a_avaliar: u.a_avaliar,
       rotuloEstado: u.a_avaliar ? "A Avaliar" : "Validado"
     }));
- 
   }
 
   let caminhoCurricular = "";

@@ -6,6 +6,7 @@
   <title><%= titulo %></title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/estilo.css">
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
 </head>
 <body>
   <%- include('./partials/navbar') %>
@@ -36,9 +37,7 @@
         <form method="POST" action="/unidades/<%= unidade.id %>/ficha/editar"
               style="display: inline;"
               onsubmit="return confirm('Isso vai sobrescrever a versão mais recente com o seu conteúdo. Tem certeza?');">
-          <input type="hidden" name="conteudo_markdown" value="<%= valores.conteudo_markdown %>">
-          <input type="hidden" name="estado_texto" value="<%= valores.estado_texto %>">
-          <input type="hidden" name="estado_bibliografia" value="<%= valores.estado_bibliografia %>">
+          <input type="hidden" name="conteudo_html" value="<%= valores.conteudo_html %>">
           <input type="hidden" name="versao_que_abri" value="<%= conflito.versaoQueAbri %>">
           <input type="hidden" name="forcar" value="1">
           <button type="submit" class="perigo">Salvar Mesmo Assim</button>
@@ -60,159 +59,65 @@
 
   <form method="POST" action="/unidades/<%= unidade.id %>/ficha/editar" id="form-ficha">
     <input type="hidden" name="versao_que_abri" value="<%= ficha.versao_atual %>">
+    <input type="hidden" name="conteudo_html" id="conteudo_html_hidden">
 
-    <div class="linha-estados">
-      <label for="estado_texto" class="label-inline">
-        Estado do Texto
-        <select id="estado_texto" name="estado_texto">
-          <% for (const [valor, rotulo] of estadosTexto) { %>
-            <option value="<%= valor %>" <%= valores.estado_texto === valor ? 'selected' : '' %>>
-              <%= rotulo %>
-            </option>
-          <% } %>
-        </select>
-      </label>
-
-      <label for="estado_bibliografia" class="label-inline">
-        Estado da Bibliografia
-        <select id="estado_bibliografia" name="estado_bibliografia">
-          <% for (const [valor, rotulo] of estadosBibliografia) { %>
-            <option value="<%= valor %>" <%= valores.estado_bibliografia === valor ? 'selected' : '' %>>
-              <%= rotulo %>
-            </option>
-          <% } %>
-        </select>
-      </label>
-
-      <span class="versao-atual">Versão atual: <strong>v<%= ficha.versao_atual %></strong></span>
+    <div class="faixa-versao">
+      v<%= ficha.versao_atual %>
+      <% if (ficha.atualizado_em) { %>
+        · Editada em <%= new Date(ficha.atualizado_em).toLocaleDateString('pt-BR') %>
+      <% } %>
     </div>
 
-    <div class="barra-formatacao" role="toolbar" aria-label="Formatação">
-      <button type="button" data-md="bold" title="Negrito">B</button>
-      <button type="button" data-md="italic" title="Itálico"><em>I</em></button>
-      <button type="button" data-md="h2" title="Título nível 2">H2</button>
-      <button type="button" data-md="h3" title="Título nível 3">H3</button>
-      <button type="button" data-md="ul" title="Lista com marcadores">• Lista</button>
-      <button type="button" data-md="ol" title="Lista numerada">1. Lista</button>
-      <button type="button" data-md="quote" title="Citação">" Citação</button>
-      <button type="button" data-md="link" title="Link">🔗 Link</button>
-      <button type="button" data-md="hr" title="Separador">— Separador</button>
-    </div>
-
-    <textarea id="conteudo_markdown" name="conteudo_markdown"
-              class="editor-markdown"><%= valores.conteudo_markdown %></textarea>
+    <div id="editor-quill"></div>
 
     <div class="acoes">
       <button type="submit">Salvar</button>
-      <button type="button" id="btn-preview" class="ghost">Pré-visualizar</button>
       <a class="botao-ghost" href="/unidades/<%= unidade.id %>" id="btn-cancelar">Cancelar</a>
     </div>
   </form>
 
-  <div id="area-preview" class="ficha-conteudo" style="display:none;"></div>
-
   <%- include('./partials/botoes-flutuantes') %>
 
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
   <script>
     (function () {
-      const textarea = document.getElementById("conteudo_markdown");
-      const selectTexto = document.getElementById("estado_texto");
-      const selectBiblio = document.getElementById("estado_bibliografia");
-      const form = document.getElementById("form-ficha");
-      const btnPreview = document.getElementById("btn-preview");
-      const areaPreview = document.getElementById("area-preview");
-      const btnCancelar = document.getElementById("btn-cancelar");
+      const conteudoInicial = <%- JSON.stringify(valores.conteudo_html || "") %>;
 
-      const textoInicial = textarea.value;
-      const estadoTextoInicial = selectTexto.value;
-      const estadoBiblioInicial = selectBiblio.value;
-
-      function estaDirty() {
-        return (
-          textarea.value !== textoInicial ||
-          selectTexto.value !== estadoTextoInicial ||
-          selectBiblio.value !== estadoBiblioInicial
-        );
-      }
-
-      function bloquearSaida(e) {
-        if (estaDirty()) {
-          e.preventDefault();
-          e.returnValue = "";
+      const quill = new Quill("#editor-quill", {
+        theme: "snow",
+        modules: {
+          toolbar: [
+            [{ header: [2, 3, false] }],
+            ["bold", "italic", "underline"],
+            [{ list: "ordered" }, { list: "bullet" }],
+            ["blockquote", "link"],
+            ["clean"]
+          ]
         }
+      });
+
+      // Carrega o conteúdo inicial no Quill.
+      // Se for HTML (fichas convertidas), ele renderiza formatado.
+      // Se for vazio, fica em branco.
+      if (conteudoInicial) {
+        quill.clipboard.dangerouslyPasteHTML(conteudoInicial);
       }
 
-      window.addEventListener("beforeunload", bloquearSaida);
+      const form = document.getElementById("form-ficha");
+      const hidden = document.getElementById("conteudo_html_hidden");
 
+      // Sincroniza o HTML do Quill para o campo escondido no submit.
       form.addEventListener("submit", () => {
-        window.removeEventListener("beforeunload", bloquearSaida);
+        // Pega o HTML do conteúdo interno do Quill.
+        const editorContent = document.querySelector("#editor-quill .ql-editor");
+        hidden.value = editorContent.innerHTML;
       });
 
-      if (btnCancelar) {
-        btnCancelar.addEventListener("click", () => {
-          window.removeEventListener("beforeunload", bloquearSaida);
-        });
-      }
-
-      const acoes = {
-        bold: (sel) => "**" + sel + "**",
-        italic: (sel) => "*" + sel + "*",
-        h2: (sel) => "## " + (sel || "Título"),
-        h3: (sel) => "### " + (sel || "Título"),
-        ul: (sel) => sel.split("\n").map(l => "- " + l).join("\n"),
-        ol: (sel) => sel.split("\n").map((l, i) => (i + 1) + ". " + l).join("\n"),
-        quote: (sel) => sel.split("\n").map(l => "> " + l).join("\n"),
-        link: (sel) => "[" + (sel || "texto") + "](https://)",
-        hr: () => "\n\n---\n\n"
-      };
-
-      document.querySelectorAll("[data-md]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const tipo = btn.getAttribute("data-md");
-          const start = textarea.selectionStart;
-          const end = textarea.selectionEnd;
-          const sel = textarea.value.substring(start, end);
-
-          let novo, cursorStart, cursorEnd;
-          if (tipo === "hr") {
-            novo = acoes.hr();
-            textarea.value = textarea.value.substring(0, start) + novo + textarea.value.substring(end);
-            cursorStart = cursorEnd = start + novo.length;
-          } else if (tipo === "ul" || tipo === "ol" || tipo === "quote") {
-            novo = acoes[tipo](sel || "item");
-            textarea.value = textarea.value.substring(0, start) + novo + textarea.value.substring(end);
-            cursorStart = start;
-            cursorEnd = start + novo.length;
-          } else {
-            novo = acoes[tipo](sel);
-            textarea.value = textarea.value.substring(0, start) + novo + textarea.value.substring(end);
-            const prefixo = tipo === "bold" ? 2 : tipo === "italic" ? 1 : tipo === "h2" ? 3 : tipo === "h3" ? 4 : 1;
-            cursorStart = start + prefixo;
-            cursorEnd = start + novo.length - prefixo;
-          }
-
-          textarea.focus();
-          textarea.setSelectionRange(cursorStart, cursorEnd);
-        });
-      });
-
-      btnPreview.addEventListener("click", async () => {
-        try {
-          const resposta = await fetch(
-            "/unidades/<%= unidade.id %>/ficha/preview",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              body: "conteudo_markdown=" + encodeURIComponent(textarea.value)
-            }
-          );
-          const html = await resposta.text();
-          areaPreview.innerHTML = html;
-          areaPreview.style.display = "block";
-          areaPreview.scrollIntoView({ behavior: "smooth", block: "start" });
-        } catch (err) {
-          areaPreview.innerHTML = "<p><em>Erro ao pré-visualizar.</em></p>";
-          areaPreview.style.display = "block";
+      // Se o conteúdo inicial estiver vazio, o Quill coloca um <p><br></p>.
+      // A gente limpa na hora de salvar (para o banco não ficar com HTML de placeholder).
+      form.addEventListener("submit", () => {
+        if (hidden.value === "<p><br></p>") {
+          hidden.value = "";
         }
       });
     })();
