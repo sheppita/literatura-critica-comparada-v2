@@ -57,9 +57,12 @@
       </p>
     <% } else { %>
       <p class="meta-ficha">
-        <span class="chip"><%= ficha.rotuloEstadoTexto %></span>
-        <span class="chip chip-suave"><%= ficha.rotuloEstadoBibliografia %></span>
-        <span class="versao">v<%= ficha.versao_atual %></span>
+        <span class="versao">
+          v<%= ficha.versao_atual %>
+          <% if (ficha.atualizado_em) { %>
+            · Editada em <%= new Date(ficha.atualizado_em).toLocaleDateString('pt-BR') %>
+          <% } %>
+        </span>
       </p>
 
       <% if (ficha.conteudo_html) { %>
