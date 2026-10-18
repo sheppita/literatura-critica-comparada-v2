@@ -53,8 +53,6 @@ const NOME_FILHO_PLURAL = {
 
 const TIPOS_COM_DESCRICAO = ["eixo", "disciplina"];
 
-// Mantidos para compatibilidade com o histórico de versões antigas.
-// Não são mais editáveis no formulário de ficha.
 const ROTULO_ESTADO_TEXTO = {
   rascunho: "Rascunho",
   em_revisao: "Em Revisão",
@@ -130,6 +128,20 @@ async function cadeiaDeSuperiores(id) {
     atual = r.rows[0].superior_id;
   }
   return cadeia;
+}
+
+// Exportação: helper para gerar o nome do arquivo com timestamp
+function nomeArquivoExportacao(prefixo) {
+  const agora = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const timestamp =
+    agora.getFullYear() +
+    pad(agora.getMonth() + 1) +
+    pad(agora.getDate()) +
+    "-" +
+    pad(agora.getHours()) +
+    pad(agora.getMinutes());
+  return `${prefixo}-${timestamp}.json`;
 }
 
 app.get("/", async (req, res) => {
@@ -481,7 +493,7 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
   }
 
   const fr = await pool.query(
-    `SELECT id, conteudo_html, versao_atual
+    `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em
        FROM fichas WHERE aula_id = $1`,
     [id]
   );
@@ -2504,6 +2516,280 @@ app.get("/unidades/:id", async (req, res) => {
     salvo,
     nadaMudou
   });
+});
+
+// ----- Rota: exportar livros (JSON) -----
+
+app.get("/exportar/livros", async (req, res) => {
+  try {
+    const obrasR = await pool.query(
+      `SELECT o.id, o.titulo, o.tipo_material,
+              COALESCE(
+                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                   FROM obras_autores oa WHERE oa.obra_id = o.id),
+                ''
+              ) AS autores
+         FROM obras o
+        WHERE o.arquivada = false
+        ORDER BY o.titulo`
+    );
+
+    const usosR = await pool.query(
+      `SELECT u.obra_id, u.papel, u.modalidade, u.orientacao,
+              u.validado_em,
+              a.id AS aula_id, a.titulo AS aula_titulo,
+              e.editora AS edicao_editora, e.ano AS edicao_ano,
+              (
+                EXISTS (
+                  SELECT 1 FROM usos u2
+                   WHERE u2.obra_id = u.obra_id
+                     AND u2.aula_id <> u.aula_id
+                )
+                AND (
+                  u.validado_em IS NULL
+                  OR EXISTS (
+                    SELECT 1 FROM usos u3
+                     WHERE u3.obra_id = u.obra_id
+                       AND u3.aula_id <> u.aula_id
+                       AND u3.atualizado_em > u.validado_em
+                  )
+                )
+              ) AS a_avaliar
+         FROM usos u
+         JOIN unidades a ON a.id = u.aula_id
+         LEFT JOIN edicoes e ON e.id = u.edicao_id
+        ORDER BY a.titulo`
+    );
+
+    const recortesR = await pool.query(
+      `SELECT uso_id, rotulo, tipo, observacao, ordem
+         FROM usos_recortes
+        ORDER BY uso_id, ordem, id`
+    );
+
+    const recortesPorUso = {};
+    for (const r of recortesR.rows) {
+      if (!recortesPorUso[r.uso_id]) recortesPorUso[r.uso_id] = [];
+      recortesPorUso[r.uso_id].push(r);
+    }
+
+    // Caminhos curriculares das aulas
+    const aulasIds = [...new Set(usosR.rows.map((u) => u.aula_id))];
+    const caminhosPorAula = {};
+    if (aulasIds.length > 0) {
+      const caminhosR = await pool.query(
+        `WITH RECURSIVE arvore AS (
+           SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel
+             FROM unidades
+            WHERE id = ANY($1::bigint[])
+           UNION ALL
+           SELECT a.raiz_id, u.id, u.titulo, u.superior_id, a.nivel + 1
+             FROM unidades u
+             JOIN arvore a ON u.id = a.superior_id
+         )
+         SELECT raiz_id,
+                STRING_AGG(titulo, ' › ' ORDER BY nivel DESC) AS caminho
+           FROM arvore
+          GROUP BY raiz_id`,
+        [aulasIds]
+      );
+      for (const row of caminhosR.rows) {
+        caminhosPorAula[row.raiz_id] = row.caminho;
+      }
+    }
+
+    // Monta o JSON agrupado por obra
+    const obrasMap = new Map();
+    for (const o of obrasR.rows) {
+      obrasMap.set(o.id, {
+        titulo: o.titulo,
+        autores: o.autores ? o.autores.split(", ") : [],
+        tipo_material: o.tipo_material,
+        usos: []
+      });
+    }
+
+    // Precisamos dos IDs de uso para buscar recortes. A consulta de usos não traz o id.
+    // Refaz a consulta com o id para casar com os recortes.
+    const usosComIdR = await pool.query(
+      `SELECT u.id AS uso_id, u.obra_id, u.papel, u.modalidade, u.orientacao,
+              u.validado_em,
+              a.id AS aula_id, a.titulo AS aula_titulo,
+              e.editora AS edicao_editora, e.ano AS edicao_ano,
+              (
+                EXISTS (
+                  SELECT 1 FROM usos u2
+                   WHERE u2.obra_id = u.obra_id
+                     AND u2.aula_id <> u.aula_id
+                )
+                AND (
+                  u.validado_em IS NULL
+                  OR EXISTS (
+                    SELECT 1 FROM usos u3
+                     WHERE u3.obra_id = u.obra_id
+                       AND u3.aula_id <> u.aula_id
+                       AND u3.atualizado_em > u.validado_em
+                  )
+                )
+              ) AS a_avaliar
+         FROM usos u
+         JOIN unidades a ON a.id = u.aula_id
+         LEFT JOIN edicoes e ON e.id = u.edicao_id
+        ORDER BY a.titulo`
+    );
+
+    for (const u of usosComIdR.rows) {
+      const obra = obrasMap.get(u.obra_id);
+      if (!obra) continue;
+      obra.usos.push({
+        aula_titulo: u.aula_titulo,
+        aula_caminho: caminhosPorAula[u.aula_id] || "",
+        papel: ROTULO_PAPEL[u.papel] || u.papel,
+        modalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
+        edicao: u.edicao_editora
+          ? `${u.edicao_editora}${u.edicao_ano ? ", " + u.edicao_ano : ""}`
+          : null,
+        orientacao: u.orientacao || null,
+        recortes: (recortesPorUso[u.uso_id] || []).map((r) => ({
+          tipo: r.tipo,
+          rotulo: r.rotulo || null,
+          observacao: r.observacao || null
+        })),
+        estado: u.a_avaliar ? "A Avaliar" : "Validado"
+      });
+    }
+
+    const json = {
+      versao_formato: 1,
+      exportado_em: new Date().toISOString(),
+      obras: Array.from(obrasMap.values()).map((o) => ({
+        ...o,
+        tipo_material: ROTULO_TIPO_MATERIAL[o.tipo_material] || o.tipo_material
+      }))
+    };
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${nomeArquivoExportacao("livros")}"`
+    );
+    res.type("application/json").send(JSON.stringify(json, null, 2));
+  } catch (err) {
+    console.error("Erro ao exportar livros:", err.message);
+    res.status(500).type("text/plain").send("Erro ao exportar livros.");
+  }
+});
+
+// ----- Rota: exportar ementa (JSON) -----
+
+app.get("/exportar/ementa", async (req, res) => {
+  try {
+    const unidadesR = await pool.query(
+      `SELECT id, tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora
+         FROM unidades
+        WHERE arquivada = false
+        ORDER BY tipo, ordem, id`
+    );
+
+    // Mapear por id para montar a árvore
+    const porId = new Map();
+    for (const u of unidadesR.rows) {
+      porId.set(u.id, {
+        id: u.id,
+        titulo: u.titulo,
+        codigo: u.codigo || null,
+        descricao: u.descricao || null,
+        pergunta_norteadora: u.pergunta_norteadora || null,
+        ordem: u.ordem,
+        tipo: u.tipo,
+        filhos: []
+      });
+    }
+
+    const raizes = [];
+    for (const u of porId.values()) {
+      if (u.tipo === "eixo") {
+        raizes.push(u);
+      } else {
+        // Encontrar o pai
+        const pai = unidadesR.rows.find((x) => x.id === u.id);
+        const paiId = pai ? pai.superior_id : null;
+        const paiObj = paiId ? porId.get(paiId) : null;
+        if (paiObj) {
+          paiObj.filhos.push(u);
+        }
+      }
+    }
+
+    // Função de ordenação
+    function ordenarArvore(no) {
+      no.filhos.sort((a, b) => (a.ordem || 0) - (b.ordem || 0) || a.id - b.id);
+      for (const f of no.filhos) ordenarArvore(f);
+    }
+    for (const r of raizes) ordenarArvore(r);
+
+    // Transformar a árvore em estrutura nomeada
+    function converter(no) {
+      if (no.tipo === "eixo") {
+        return {
+          id: no.id,
+          titulo: no.titulo,
+          codigo: no.codigo,
+          descricao: no.descricao,
+          ordem: no.ordem,
+          disciplinas: no.filhos
+            .filter((f) => f.tipo === "disciplina")
+            .map(converterDisciplina)
+        };
+      }
+      return null;
+    }
+
+    function converterDisciplina(no) {
+      return {
+        id: no.id,
+        titulo: no.titulo,
+        codigo: no.codigo,
+        descricao: no.descricao,
+        ordem: no.ordem,
+        temas: no.filhos.filter((f) => f.tipo === "tema").map(converterTema)
+      };
+    }
+
+    function converterTema(no) {
+      return {
+        id: no.id,
+        titulo: no.titulo,
+        codigo: no.codigo,
+        pergunta_norteadora: no.pergunta_norteadora,
+        ordem: no.ordem,
+        aulas: no.filhos.filter((f) => f.tipo === "aula").map(converterAula)
+      };
+    }
+
+    function converterAula(no) {
+      return {
+        id: no.id,
+        titulo: no.titulo,
+        codigo: no.codigo,
+        ordem: no.ordem
+      };
+    }
+
+    const json = {
+      versao_formato: 1,
+      exportado_em: new Date().toISOString(),
+      eixos: raizes.map(converter)
+    };
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${nomeArquivoExportacao("ementa")}"`
+    );
+    res.type("application/json").send(JSON.stringify(json, null, 2));
+  } catch (err) {
+    console.error("Erro ao exportar ementa:", err.message);
+    res.status(500).type("text/plain").send("Erro ao exportar ementa.");
+  }
 });
 
 app.get("/health", async (req, res) => {
