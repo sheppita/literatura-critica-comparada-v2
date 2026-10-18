@@ -1072,3 +1072,19 @@ body {
   font-size: 1.1rem;
   color: var(--marrom);
 }
+
+/* Respeitar o tipo de lista do Quill (bullet vs. numerada) */
+.ficha-conteudo ol li[data-list="bullet"] {
+  list-style-type: disc;
+}
+.ficha-conteudo ol li[data-list="ordered"] {
+  list-style-type: decimal;
+}
+
+/* Se o Quill usar <ul> em versões futuras, também cobre */
+.ficha-conteudo ul li[data-list="bullet"] {
+  list-style-type: disc;
+}
+.ficha-conteudo ul li[data-list="ordered"] {
+  list-style-type: decimal;
+}
