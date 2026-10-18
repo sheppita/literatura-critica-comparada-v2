@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/estilo.css">
   <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
 </head>
-<body class="pagina-ficha">
+<body>
   <%- include('./partials/navbar') %>
 
   <p class="caminho">
@@ -96,9 +96,6 @@
         }
       });
 
-      // Carrega o conteúdo inicial no Quill.
-      // Se for HTML (fichas convertidas), ele renderiza formatado.
-      // Se for vazio, fica em branco.
       if (conteudoInicial) {
         quill.clipboard.dangerouslyPasteHTML(conteudoInicial);
       }
@@ -106,16 +103,9 @@
       const form = document.getElementById("form-ficha");
       const hidden = document.getElementById("conteudo_html_hidden");
 
-      // Sincroniza o HTML do Quill para o campo escondido no submit.
       form.addEventListener("submit", () => {
-        // Pega o HTML do conteúdo interno do Quill.
         const editorContent = document.querySelector("#editor-quill .ql-editor");
         hidden.value = editorContent.innerHTML;
-      });
-
-      // Se o conteúdo inicial estiver vazio, o Quill coloca um <p><br></p>.
-      // A gente limpa na hora de salvar (para o banco não ficar com HTML de placeholder).
-      form.addEventListener("submit", () => {
         if (hidden.value === "<p><br></p>") {
           hidden.value = "";
         }
