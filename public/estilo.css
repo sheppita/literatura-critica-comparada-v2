@@ -576,8 +576,12 @@ footer a:hover { color: var(--terracota); }
   letter-spacing: -0.01em;
 }
 .navbar-logo:hover { color: var(--terracota); text-decoration: none; }
-.navbar-links { display: flex; gap: 1rem; font-size: 0.9rem; }
-.navbar-links a {
+.navbar-links { 
+  display: flex; 
+  gap: 1rem; 
+  font-size: 0.9rem; 
+  align-items: center;
+}.navbar-links a {
   color: var(--marrom);
   text-decoration: none;
   font-weight: 500;
@@ -646,11 +650,17 @@ body { padding-top: 3.4rem; }
   font-family: inherit;
   font-weight: 500;
   font-size: 0.9rem;
-  padding: 0.2rem 0;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
-.menu-exportar-botao:hover {
-  color: var(--terracota);
+
+
+.menu-exportar-botao:hover, 
+.menu-exportar.aberto .menu-exportar-botao {
+  background: var(--terracota);
+  color: #fff;
 }
 
 .menu-exportar-lista {
@@ -683,4 +693,63 @@ body { padding-top: 3.4rem; }
   background: var(--creme-escuro);
   color: var(--terracota);
   text-decoration: none;
+}
+
+/* --- Ajustes da caixa de Recortes --- */
+.bloco-recortes {
+  border: none; /* Remove a borda feia (azul/cinza) */
+  padding: 0; /* Remove o recuo interno padrão */
+  margin-top: 1.2rem; /* Dá o mesmo espaçamento dos outros campos */
+  margin-bottom: 0;
+}
+
+.bloco-recortes legend {
+  font-weight: 600;
+  color: var(--marrom);
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+
+/* --- Ajuste da linha de recortes --- */
+.recorte-linha {
+  display: flex;
+  gap: 0.5rem; /* Espaço entre os campos */
+  align-items: flex-start; /* Alinha todos pelo topo */
+  margin-bottom: 0.5rem; /* Espaço entre uma linha de recorte e outra */
+}
+
+/* Deixa o dropdown e os textos ocupando o espaço certo */
+.recorte-linha select {
+  flex: 1; /* Ocupa 1 parte do espaço */
+  min-width: 120px;
+  margin: 0; /* Remove margens que possam vir de outras regras */
+}
+
+.recorte-linha input {
+  flex: 2; /* Ocupa 2 partes do espaço (fica maior que o select) */
+  margin: 0;
+}
+
+/* Arruma o botão "x" */
+.recorte-linha .btn-remover-recorte {
+  flex: 0 0 auto; /* Impede que o botão seja esmagado */
+  background: transparent;
+  color: var(--terracota);
+  border: 1.5px solid var(--terracota);
+  padding: 0.5rem 0.8rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  height: 38px; /* Mesma altura do select e do input */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.recorte-linha .btn-remover-recorte:hover {
+  background: var(--terracota);
+  color: #fff;
 }
