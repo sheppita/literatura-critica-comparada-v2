@@ -97,6 +97,7 @@ const ROTULO_RECORTE_TIPO = {
   ensaio: "Ensaio",
   conto: "Conto",
   poema: "Poema",
+  artigo: "Artigo",
   a_conferir: "A Conferir"
 };
 

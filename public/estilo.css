@@ -632,3 +632,55 @@ body { padding-top: 3.4rem; }
 .ficha-conteudo {
   max-width: 100%;
 }
+
+/* Menu Exportar (dropdown na navbar) */
+.menu-exportar {
+  position: relative;
+  display: inline-block;
+}
+
+.menu-exportar-botao {
+  background: transparent;
+  color: var(--marrom);
+  border: none;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 0.2rem 0;
+  cursor: pointer;
+}
+.menu-exportar-botao:hover {
+  color: var(--terracota);
+}
+
+.menu-exportar-lista {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: #fffdf7;
+  border: 1px solid var(--creme-escuro);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(90, 60, 40, 0.12);
+  min-width: 140px;
+  padding: 0.3rem 0;
+  z-index: 200;
+}
+
+.menu-exportar.aberto .menu-exportar-lista {
+  display: block;
+}
+
+.menu-exportar-lista a {
+  display: block;
+  padding: 0.5rem 1rem;
+  color: var(--marrom);
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.menu-exportar-lista a:hover {
+  background: var(--creme-escuro);
+  color: var(--terracota);
+  text-decoration: none;
+}

@@ -6,8 +6,50 @@
       <a href="/obras">Bibliografia</a>
       <a href="/revisao">Revisão</a>
       <a href="/obras/nova">+ Obra</a>
-      <a href="/exportar/livros">Exportar Livros</a>
-      <a href="/exportar/ementa">Exportar Ementa</a>
+
+      <div class="menu-exportar" id="menu-exportar">
+        <button type="button" class="menu-exportar-botao" id="btn-exportar"
+                aria-haspopup="true" aria-expanded="false">
+          Exportar ▾
+        </button>
+        <div class="menu-exportar-lista" id="lista-exportar" role="menu">
+          <a href="/exportar/livros" role="menuitem">Obras</a>
+          <a href="/exportar/ementa" role="menuitem">Ementa</a>
+        </div>
+      </div>
     </div>
   </div>
 </nav>
+
+<script>
+  (function () {
+    const menu = document.getElementById("menu-exportar");
+    const botao = document.getElementById("btn-exportar");
+    if (!menu || !botao) return;
+
+    function fechar() {
+      menu.classList.remove("aberto");
+      botao.setAttribute("aria-expanded", "false");
+    }
+
+    function alternar() {
+      const aberto = menu.classList.toggle("aberto");
+      botao.setAttribute("aria-expanded", aberto ? "true" : "false");
+    }
+
+    botao.addEventListener("click", (e) => {
+      e.stopPropagation();
+      alternar();
+    });
+
+    // Fecha ao clicar fora do menu
+    document.addEventListener("click", (e) => {
+      if (!menu.contains(e.target)) fechar();
+    });
+
+    // Fecha com Esc
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") fechar();
+    });
+  })();
+</script>
