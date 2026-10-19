@@ -128,9 +128,23 @@
                     <% 
                       let itensRecorte = [];
                       for (let r of u.recortes) {
-                        // Tenta pegar o rótulo. Se não tiver, tenta a observação. Se não tiver nenhum, mostra "Recorte sem nome".
-                        let base = r.rotulo || r.observacao || 'Recorte sem nome';
-                        itensRecorte.push(base);
+                        // Pega o rótulo (ou vazio) e a observação (ou vazio)
+                        let rotulo = r.rotulo || "";
+                        let obs = r.observacao || "";
+                        
+                        // Junta os dois com um traço no meio, se ambos existirem
+                        let textoFinal = "";
+                        if (rotulo && obs) {
+                          textoFinal = rotulo + " — " + obs;
+                        } else if (rotulo) {
+                          textoFinal = rotulo;
+                        } else if (obs) {
+                          textoFinal = obs;
+                        } else {
+                          textoFinal = "Recorte sem nome";
+                        }
+                        
+                        itensRecorte.push(textoFinal);
                       }
                     %>
                     <%= itensRecorte.join(' · ') %>
