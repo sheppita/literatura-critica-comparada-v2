@@ -81,11 +81,6 @@
       <div id="lista-recortes">
         <% for (const r of valores.recortes) { %>
           <div class="recorte-linha">
-            <select name="recorte_tipo[]">
-              <% for (const [valor, rotulo] of tiposRecorte) { %>
-                <option value="<%= valor %>" <%= r.tipo === valor ? 'selected' : '' %>><%= rotulo %></option>
-              <% } %>
-            </select>
             <input type="text" name="recorte_rotulo[]" placeholder="Rótulo (ex.: Cap. 3)" value="<%= r.rotulo %>">
             <input type="text" name="recorte_observacao[]" placeholder="Observação" value="<%= r.observacao %>">
             <button type="button" class="btn-remover-recorte botao-ghost">×</button>
@@ -117,11 +112,6 @@
 
   <template id="molde-recorte">
     <div class="recorte-linha">
-      <select name="recorte_tipo[]">
-        <% for (const [valor, rotulo] of tiposRecorte) { %>
-          <option value="<%= valor %>"><%= rotulo %></option>
-        <% } %>
-      </select>
       <input type="text" name="recorte_rotulo[]" placeholder="Rótulo (ex.: Cap. 3)">
       <input type="text" name="recorte_observacao[]" placeholder="Observação">
       <button type="button" class="btn-remover-recorte botao-ghost">×</button>
