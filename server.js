@@ -1973,15 +1973,19 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   }
 
   const recortes = [];
-  for (let i = 0; i < tipos.length; i++) {
-    const tipo = String(tipos[i] || "").trim();
-    if (!ROTULO_RECORTE_TIPO[tipo]) continue;
+  // Em vez de ler o dropdown que não existe mais, vamos ler apenas o rótulo e a observação
+  for (let i = 0; i < rotulos.length; i++) {
     const rotulo = String(rotulos[i] || "").trim() || null;
     const observacao = String(observacoesRec[i] || "").trim() || null;
-    if (!rotulo && !observacao && tipo !== "a_conferir") {
+    
+    // Se estiver totalmente em branco, pula
+    if (!rotulo && !observacao) {
       continue;
     }
-    recortes.push({ rotulo, tipo: 'a_conferir', observacao });  }
+    
+    // Salva forçando o tipo como 'a_conferir', pois não usamos mais o dropdown
+    recortes.push({ rotulo, tipo: 'a_conferir', observacao });
+  }
 
   if (erros.length > 0) {
     const or = await pool.query(
@@ -2199,16 +2203,20 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
     }
   }
 
-  const recortes = [];
-  for (let i = 0; i < tipos.length; i++) {
-    const tipo = String(tipos[i] || "").trim();
-    if (!ROTULO_RECORTE_TIPO[tipo]) continue;
+   const recortes = [];
+  // Em vez de ler o dropdown que não existe mais, vamos ler apenas o rótulo e a observação
+  for (let i = 0; i < rotulos.length; i++) {
     const rotulo = String(rotulos[i] || "").trim() || null;
     const observacao = String(observacoesRec[i] || "").trim() || null;
-    if (!rotulo && !observacao && tipo !== "a_conferir") {
+    
+    // Se estiver totalmente em branco, pula
+    if (!rotulo && !observacao) {
       continue;
     }
-    recortes.push({ rotulo, tipo: 'a_conferir', observacao });  }
+    
+    // Salva forçando o tipo como 'a_conferir', pois não usamos mais o dropdown
+    recortes.push({ rotulo, tipo: 'a_conferir', observacao });
+  }
 
   if (erros.length > 0) {
     const or = await pool.query(
