@@ -1981,8 +1981,7 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
     if (!rotulo && !observacao && tipo !== "a_conferir") {
       continue;
     }
-    recortes.push({ rotulo, tipo, observacao });
-  }
+    recortes.push({ rotulo, tipo: 'a_conferir', observacao });  }
 
   if (erros.length > 0) {
     const or = await pool.query(
@@ -2209,8 +2208,7 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
     if (!rotulo && !observacao && tipo !== "a_conferir") {
       continue;
     }
-    recortes.push({ rotulo, tipo, observacao });
-  }
+    recortes.push({ rotulo, tipo: 'a_conferir', observacao });  }
 
   if (erros.length > 0) {
     const or = await pool.query(
