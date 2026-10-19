@@ -853,3 +853,24 @@ body { padding-top: 3.4rem; }
 .tabela-obras td:nth-child(5) {
   text-align: center;
 }
+
+/* --- Alinhamento do Cabeçalho dos Cards de Uso --- */
+.uso-cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start; 
+  gap: 1rem; 
+}
+
+.uso-obra {
+  flex: 1; 
+  min-width: 0; 
+  line-height: 1.4;
+  order: 1; /* Força o título a ficar na esquerda */
+}
+
+.uso-acoes {
+  flex-shrink: 0; 
+  margin-top: 0.1rem; 
+  order: 2; /* Força a tag a ficar na direita */
+}
