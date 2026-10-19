@@ -753,3 +753,71 @@ body { padding-top: 3.4rem; }
   background: var(--terracota);
   color: #fff;
 }
+
+/* --- Autocomplete de Obras --- */
+.autocomplete-container {
+  position: relative;
+  width: 100%;
+}
+
+.autocomplete-container input[type="text"] {
+  padding-right: 2rem; /* Espaço para o botão de limpar */
+}
+
+.btn-limpar {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--texto-suave);
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 0.3rem;
+}
+.btn-limpar:hover {
+  color: var(--terracota);
+}
+
+.lista-autocomplete {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fffdf7;
+  border: 1px solid var(--creme-escuro);
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 12px rgba(90, 60, 40, 0.12);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  z-index: 100;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.lista-autocomplete li {
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--creme-escuro);
+  font-size: 0.95rem;
+  color: var(--marrom);
+}
+
+.lista-autocomplete li:last-child {
+  border-bottom: none;
+}
+
+.lista-autocomplete li:hover {
+  background: var(--creme-escuro);
+  color: var(--terracota);
+}
+
+.lista-autocomplete li.vazio {
+  color: var(--texto-suave);
+  cursor: default;
+  font-style: italic;
+}

@@ -1113,6 +1113,46 @@ app.post("/obras/nova", async (req, res) => {
   }
 });
 
+// Rota para buscar obras no autocomplete
+app.get("/obras/buscar", async (req, res) => {
+  try {
+    const termo = String(req.query.q || "").trim();
+    
+    // Se o termo for muito curto, não busca (evita trazer tudo)
+    if (termo.length < 2) {
+      return res.json([]);
+    }
+
+    // Busca por título ou por autor (usando as tabelas obras e obras_autores)
+    const busca = `%${termo}%`;
+    const r = await pool.query(
+      `SELECT o.id, o.titulo,
+              COALESCE(
+                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
+                   FROM obras_autores oa WHERE oa.obra_id = o.id),
+                ''
+              ) AS autores
+         FROM obras o
+        WHERE o.arquivada = false
+          AND (
+            o.titulo ILIKE $1
+            OR EXISTS (
+              SELECT 1 FROM obras_autores oa
+               WHERE oa.obra_id = o.id AND oa.nome ILIKE $1
+            )
+          )
+        ORDER BY o.titulo
+        LIMIT 12`,
+      [busca]
+    );
+
+    res.json(r.rows);
+  } catch (err) {
+    console.error("Erro na busca de obras:", err.message);
+    res.status(500).json({ erro: "Erro ao buscar obras." });
+  }
+});
+
 app.get("/obras/mesclar", async (req, res) => {
   const or = await pool.query(
     `SELECT o.id, o.titulo,
