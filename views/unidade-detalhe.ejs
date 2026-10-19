@@ -128,15 +128,9 @@
                     <% 
                       let itensRecorte = [];
                       for (let r of u.recortes) {
-                        if (r.tipo === 'a_conferir') {
-                          itensRecorte.push('A conferir');
-                        } else {
-                          let base = r.rotulo || r.tipo;
-                          if (r.observacao) {
-                            base = base + ' — ' + r.observacao;
-                          }
-                          itensRecorte.push(base);
-                        }
+                        // Tenta pegar o rótulo. Se não tiver, tenta a observação. Se não tiver nenhum, mostra "Recorte sem nome".
+                        let base = r.rotulo || r.observacao || 'Recorte sem nome';
+                        itensRecorte.push(base);
                       }
                     %>
                     <%= itensRecorte.join(' · ') %>
