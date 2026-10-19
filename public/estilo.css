@@ -822,14 +822,34 @@ body { padding-top: 3.4rem; }
   font-style: italic;
 }
 
-/* --- Ajustes na tabela de obras --- */
-.tabela-obras th,
-.tabela-obras td {
-  white-space: nowrap; /* Impede que o texto quebre em duas linhas */
+/* --- Distribuição elegante da tabela de obras --- */
+.tabela-obras {
+  width: 100%;
+  table-layout: auto; /* Deixa o navegador calcular o melhor espaço */
 }
 
-/* Garante que os chips fiquem bonitos e sem quebrar */
+/* Apenas os cabeçalhos e as células de status não quebram a linha */
+.tabela-obras th {
+  white-space: nowrap; 
+}
+
 .chip {
-  white-space: nowrap;
+  white-space: nowrap; /* Impede a bolinha de quebrar */
   display: inline-block;
+}
+
+/* Dá mais espaço para a coluna principal (Título/Autoria) e aperta um pouco as outras */
+.tabela-obras th:nth-child(2),
+.tabela-obras td:nth-child(2) {
+  width: 50%; /* A coluna do livro fica com metade do espaço */
+}
+
+/* Alinha o texto das colunas de "Usos", "Avaliação" e "Edições" ao centro */
+.tabela-obras th:nth-child(3),
+.tabela-obras td:nth-child(3),
+.tabela-obras th:nth-child(4),
+.tabela-obras td:nth-child(4),
+.tabela-obras th:nth-child(5),
+.tabela-obras td:nth-child(5) {
+  text-align: center;
 }
