@@ -63,17 +63,16 @@
     </p>
   <% } else { %>
     <p class="contador-resultados">
-      <%= obras.length %> obra<%= obras.length === 1 ? '' : 's' %>
-      <% if (temFiltro) { %> encontrada<%= obras.length === 1 ? '' : 's' %><% } %>.
+      <%= obras.length %> Obra<%= obras.length === 1 ? '' : 's' %>
+      <% if (temFiltro) { %> encontrada<%= obras.length === 1 ? '' : 's' %><% } %>
     </p>
-
     <table class="tabela-versoes tabela-obras">
       <thead>
         <tr>
           <th></th>
-          <th>Título / Autoria</th>
-          <th>Aparece em</th>
-          <th>Avaliação</th>
+          <th>Livros</th>
+          <th>Usos</th>
+          <th>Situação</th>
           <th>Edições</th>
         </tr>
       </thead>

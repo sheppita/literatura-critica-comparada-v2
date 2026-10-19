@@ -821,3 +821,15 @@ body { padding-top: 3.4rem; }
   cursor: default;
   font-style: italic;
 }
+
+/* --- Ajustes na tabela de obras --- */
+.tabela-obras th,
+.tabela-obras td {
+  white-space: nowrap; /* Impede que o texto quebre em duas linhas */
+}
+
+/* Garante que os chips fiquem bonitos e sem quebrar */
+.chip {
+  white-space: nowrap;
+  display: inline-block;
+}
