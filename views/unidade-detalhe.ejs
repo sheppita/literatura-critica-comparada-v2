@@ -125,12 +125,21 @@
                 </div>
                 <% if (u.recortes.length > 0) { %>
                   <div class="detalhe-suave">
-                    Recortes:
-                    <%= u.recortes.map(r => {
-                      if (r.tipo === 'a_conferir') return 'A conferir';
-                      const base = r.rotulo || r.tipo;
-                      return r.observacao ? `${base} — ${r.observacao}` : base;
-                    }).join(' · ') %>
+                    <% 
+                      let itensRecorte = [];
+                      for (let r of u.recortes) {
+                        if (r.tipo === 'a_conferir') {
+                          itensRecorte.push('A conferir');
+                        } else {
+                          let base = r.rotulo || r.tipo;
+                          if (r.observacao) {
+                            base = base + ' — ' + r.observacao;
+                          }
+                          itensRecorte.push(base);
+                        }
+                      }
+                    %>
+                    <%= itensRecorte.join(' · ') %>
                   </div>
                 <% } else if (u.modalidade === 'parcial') { %>
                   <div class="detalhe-suave">
