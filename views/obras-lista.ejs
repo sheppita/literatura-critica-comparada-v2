@@ -19,15 +19,35 @@
 
   <div class="filtros-capsula">
     <a href="/obras<%= filtros.q ? '?q=' + encodeURIComponent(filtros.q) : '' %>"
-       class="capsula <%= !filtros.avaliacao ? 'capsula-ativa' : '' %>">
+       class="capsula <%= !filtros.avaliacao && !filtros.estado && !filtros.tipo ? 'capsula-ativa' : '' %>">
       Todas
     </a>
     <a href="/obras?avaliacao=a_avaliar<%= filtros.q ? '&q=' + encodeURIComponent(filtros.q) : '' %>"
        class="capsula <%= filtros.avaliacao === 'a_avaliar' ? 'capsula-ativa' : '' %>">
       A Avaliar
     </a>
-  </div>
+    
+    <!-- Filtro por Estado -->
+    <a href="/obras?estado=incompleta<%= filtros.q ? '&q=' + encodeURIComponent(filtros.q) : '' %>"
+       class="capsula <%= filtros.estado === 'incompleta' ? 'capsula-ativa' : '' %>">
+      Incompletas
+    </a>
 
+    <!-- Filtros por Tipo de Material -->
+    <a href="/obras?tipo=livro<%= filtros.q ? '&q=' + encodeURIComponent(filtros.q) : '' %>"
+       class="capsula <%= filtros.tipo === 'livro' ? 'capsula-ativa' : '' %>">
+      Livros
+    </a>
+    <a href="/obras?tipo=artigo<%= filtros.q ? '&q=' + encodeURIComponent(filtros.q) : '' %>"
+       class="capsula <%= filtros.tipo === 'artigo' ? 'capsula-ativa' : '' %>">
+      Artigos
+    </a>
+    <a href="/obras?tipo=revista<%= filtros.q ? '&q=' + encodeURIComponent(filtros.q) : '' %>"
+       class="capsula <%= filtros.tipo === 'revista' ? 'capsula-ativa' : '' %>">
+      Revistas
+    </a>
+  </div>
+  
   <form method="GET" action="/obras" class="filtros-obras">
     <% if (filtros.avaliacao) { %>
       <input type="hidden" name="avaliacao" value="<%= filtros.avaliacao %>">

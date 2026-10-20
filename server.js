@@ -925,19 +925,7 @@ app.get("/obras", async (req, res) => {
                 SELECT 1
                   FROM usos u
                  WHERE u.obra_id = o.id
-                   AND (
-                     u.edicao_id IS NULL
-                     OR EXISTS (
-                       SELECT 1 FROM usos_recortes r
-                        WHERE r.uso_id = u.id AND r.tipo = 'a_conferir'
-                     )
-                     OR (
-                       u.modalidade = 'parcial'
-                       AND NOT EXISTS (
-                         SELECT 1 FROM usos_recortes r2 WHERE r2.uso_id = u.id
-                       )
-                     )
-                   )
+                   AND u.edicao_id IS NULL
               ) AS tem_pendencia
          FROM obras o
          ${where}
@@ -1952,7 +1940,6 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   const orientacao = String(req.body.orientacao || "").trim() || null;
 
   const rotulos = [].concat(req.body.recorte_rotulo || []);
-  const tipos = [].concat(req.body.recorte_tipo || []);
   const observacoesRec = [].concat(req.body.recorte_observacao || []);
 
   const erros = [];
@@ -2180,7 +2167,6 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
   const orientacao = String(req.body.orientacao || "").trim() || null;
 
   const rotulos = [].concat(req.body.recorte_rotulo || []);
-  const tipos = [].concat(req.body.recorte_tipo || []);
   const observacoesRec = [].concat(req.body.recorte_observacao || []);
 
   const erros = [];
@@ -2203,7 +2189,7 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
     }
   }
 
-   const recortes = [];
+  const recortes = [];
   // Em vez de ler o dropdown que não existe mais, vamos ler apenas o rótulo e a observação
   for (let i = 0; i < rotulos.length; i++) {
     const rotulo = String(rotulos[i] || "").trim() || null;
