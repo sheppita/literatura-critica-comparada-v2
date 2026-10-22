@@ -2845,6 +2845,129 @@ app.get("/health", async (req, res) => {
   }
 });
 
+// ----- Rota: importar temas em lote (texto cru ou JSON) -----
+app.post("/unidades/:id/temas/importar", express.json({ limit: "5mb" }), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const dr = await pool.query(
+    "SELECT id, tipo, titulo FROM unidades WHERE id = $1 AND arquivada = false",
+    [id]
+  );
+  if (dr.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Disciplina não encontrada.");
+  }
+  const disciplina = dr.rows[0];
+  if (disciplina.tipo !== "disciplina") {
+    return res.status(400).type("text/plain").send("Só disciplinas recebem temas.");
+  }
+
+  // Aceita 3 formatos:
+  // 1) JSON: { temas: [...] } ou [...]
+  // 2) Texto cru vindo do formulário: { texto: "1.1 — Título\n1.2 — Título" }
+  let entrada = null;
+
+  if (req.body && typeof req.body.texto === "string") {
+    // Formato do formulário: texto cru, uma linha por tema
+    const linhas = req.body.texto
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+
+    entrada = linhas.map((linha) => {
+      // Tenta casar "1.1 — Título" ou "1.1 - Título" ou "1.1. Título"
+      const m = linha.match(/^([0-9]+(?:\.[0-9]+)*)\s*[—–\-\.]\s*(.+)$/);
+      if (m) {
+        return { codigo: m[1].trim(), titulo: m[2].trim() };
+      }
+      return { codigo: null, titulo: linha };
+    });
+  } else {
+    entrada = Array.isArray(req.body) ? req.body : req.body && req.body.temas;
+  }
+
+  if (!Array.isArray(entrada) || entrada.length === 0) {
+    return res.status(400).type("text/plain").send("Nenhum tema encontrado no texto enviado.");
+  }
+
+  const temas = [];
+  const erros = [];
+  entrada.forEach((t, i) => {
+    const titulo = String((t && t.titulo) || "").trim();
+    const codigo = String((t && t.codigo) || "").trim() || null;
+    const pergunta = String((t && t.pergunta_norteadora) || "").trim() || null;
+    if (!titulo) { erros.push("Item " + (i + 1) + ": título é obrigatório."); return; }
+    temas.push({ titulo, codigo, pergunta });
+  });
+  if (erros.length > 0) {
+    return res.status(400).json({ erros });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const ordemR = await client.query(
+      "SELECT COALESCE(MAX(ordem), 0) AS ultima FROM unidades WHERE tipo = 'tema' AND superior_id = $1 AND arquivada = false",
+      [id]
+    );
+    let ordem = ordemR.rows[0].ultima;
+    const criados = [];
+    for (const t of temas) {
+      ordem += 1;
+      const r = await client.query(
+        "INSERT INTO unidades (tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora) VALUES ('tema', $1, $2, $3, $4, NULL, $5) RETURNING id, titulo, ordem",
+        [t.titulo, t.codigo, id, ordem, t.pergunta]
+      );
+      criados.push(r.rows[0]);
+    }
+    await client.query("COMMIT");
+
+    if (req.is("application/json")) {
+      return res.json({ ok: true, disciplina, criados });
+    }
+    res.redirect("/unidades/" + id + "?salvo=1");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao importar temas:", err.message);
+    res.status(500).type("text/plain").send("Erro interno ao importar. Nada foi gravado.");
+  } finally {
+    client.release();
+  }
+});
+// ----- Fim da rota de importação de temas -----
+
+// ----- Tela: importar temas em lote -----
+app.get("/unidades/:id/temas/importar", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).type("text/plain").send("Id inválido.");
+  }
+
+  const dr = await pool.query(
+    "SELECT id, tipo, titulo, codigo, superior_id FROM unidades WHERE id = $1 AND arquivada = false",
+    [id]
+  );
+  if (dr.rows.length === 0) {
+    return res.status(404).type("text/plain").send("Disciplina não encontrada.");
+  }
+  const disciplina = dr.rows[0];
+  if (disciplina.tipo !== "disciplina") {
+    return res.status(400).type("text/plain").send("Só disciplinas recebem temas.");
+  }
+
+  const cadeia = await cadeiaDeSuperiores(disciplina.superior_id);
+
+  res.render("temas-importar", {
+    titulo: "Importar Temas — " + disciplina.titulo,
+    disciplina,
+    cadeia,
+    erros: []
+  });
+});
+// ----- Fim da tela de importação -----
+
 app.listen(PORT, () => {
   console.log(`Servidor ouvindo em http://localhost:${PORT}`);
 });

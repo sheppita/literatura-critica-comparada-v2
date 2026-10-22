@@ -145,11 +145,25 @@
               <% if (u.recortes.length > 0) { %>
                 <div class="detalhe-suave">
                   Recortes:
-                  <%= u.recortes.map(r => {
-                    if (r.tipo === 'a_conferir') return 'A conferir';
-                    const base = r.rotulo || r.tipo;
-                    return r.observacao ? `${base} — ${r.observacao}` : base;
-                  }).join(' · ') %>
+                  <% 
+                    let itensRecorte = [];
+                    for (let r of u.recortes) {
+                      let rotulo = r.rotulo || "";
+                      let obs = r.observacao || "";
+                      let textoFinal = "";
+                      if (rotulo && obs) {
+                        textoFinal = rotulo + " — " + obs;
+                      } else if (rotulo) {
+                        textoFinal = rotulo;
+                      } else if (obs) {
+                        textoFinal = obs;
+                      } else {
+                        textoFinal = "Recorte sem nome";
+                      }
+                      itensRecorte.push(textoFinal);
+                    }
+                  %>
+                  <%= itensRecorte.join(' · ') %>
                 </div>
               <% } else if (u.modalidade === 'parcial') { %>
                 <div class="detalhe-suave">
