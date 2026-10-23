@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %></title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <%- include('./partials/navbar') %>
+
+  <p class="caminho">
+    <a href="/">Início</a>
+    <% for (const u of cadeia) { %> › <a href="/unidades/<%= u.id %>"><%= u.titulo %></a><% } %>
+    › <a href="/unidades/<%= unidade.id %>"><%= unidade.titulo %></a> › Editar Ficha
+  </p>
+
+  <h1>Editar Ficha</h1>
+  <p class="subtitulo">Aula: <%= unidade.titulo %></p>
+
+  <% if (erros && erros.length > 0) { %>
+    <div class="erros">
+      <ul><% for (const e of erros) { %><li><%= e %></li><% } %></ul>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/unidades/<%= unidade.id %>/ficha/editar">
+    <label for="problema">Problema da Aula</label>
+    <textarea id="problema" name="problema" rows="4"><%= valores.problema %></textarea>
+
+    <label for="mapa">Mapa Conceitual</label>
+    <textarea id="mapa" name="mapa" rows="6"><%= valores.mapa %></textarea>
+
+    <label for="apresentacao">Apresentação</label>
+    <textarea id="apresentacao" name="apresentacao" rows="6"><%= valores.apresentacao %></textarea>
+
+    <div class="acoes">
+      <button type="submit">Salvar Ficha</button>
+      <a class="botao-ghost" href="/unidades/<%= unidade.id %>">Cancelar</a>
+    </div>
+  </form>
+</body>
+</html>

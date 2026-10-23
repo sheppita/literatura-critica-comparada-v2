@@ -270,7 +270,7 @@ app.post("/unidades/nova", async (req, res) => {
 
   if (tipo === "aula") {
     await pool.query(
-      "INSERT INTO fichas (aula_id) VALUES ($1) ON CONFLICT (aula_id) DO NOTHING",
+      "INSERT INTO fichas (aula_id, modelo) VALUES ($1, 'novo') ON CONFLICT (aula_id) DO NOTHING",
       [insertR.rows[0].id]
     );
   }
@@ -494,7 +494,7 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
   }
 
   const fr = await pool.query(
-    `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em
+    `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, mapa, apresentacao
        FROM fichas WHERE aula_id = $1`,
     [id]
   );
@@ -513,6 +513,23 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
     };
   }
 
+  // Se for o modelo novo, renderiza o editor novo
+  if (ficha.modelo === "novo") {
+    return res.render("ficha-editor-novo", {
+      titulo: `Editar Ficha — ${unidade.titulo}`,
+      unidade,
+      ficha,
+      cadeia,
+      valores: {
+        problema: ficha.problema || "",
+        mapa: ficha.mapa || "",
+        apresentacao: ficha.apresentacao || ""
+      },
+      erros: []
+    });
+  }
+
+  // Se não, segue o fluxo antigo (Quill)
   res.render("ficha-editor", {
     titulo: `Editar Ficha — ${unidade.titulo}`,
     unidade,
@@ -544,21 +561,72 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     return res.status(400).type("text/plain").send("Só aulas têm ficha.");
   }
 
+  const fr = await pool.query(
+    `SELECT id, conteudo_html, versao_atual, modelo, problema, mapa, apresentacao
+       FROM fichas WHERE aula_id = $1`,
+    [id]
+  );
+  const ficha = fr.rows.length > 0 ? fr.rows[0] : null;
+  
+  if (!ficha) {
+    return res.status(404).type("text/plain").send("Ficha não encontrada para esta aula.");
+  }
+
+  // --- LÓGICA DO NOVO MODELO ---
+  if (ficha.modelo === "novo") {
+    const problema = String(req.body.problema || "").trim();
+    const mapa = String(req.body.mapa || "").trim();
+    const apresentacao = String(req.body.apresentacao || "").trim();
+
+    // Verifica se algo mudou
+    const mudou = ficha.problema !== problema || ficha.mapa !== mapa || ficha.apresentacao !== apresentacao;
+    if (!mudou) {
+      return res.redirect(`/unidades/${id}?salvo=0`);
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const updateR = await client.query(
+        `UPDATE fichas
+            SET problema = $1, mapa = $2, apresentacao = $3,
+                versao_atual = versao_atual + 1, atualizado_em = now()
+          WHERE id = $4
+          RETURNING versao_atual`,
+        [problema, mapa, apresentacao, ficha.id]
+      );
+
+      const novaVersao = updateR.rows[0].versao_atual;
+      
+      // Salva o histórico como JSON dentro do conteudo_html para manter compatibilidade
+      const historicoJson = JSON.stringify({ problema, mapa, apresentacao });
+      
+      await client.query(
+        `INSERT INTO fichas_versoes
+           (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia)
+         VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
+        [ficha.id, novaVersao, historicoJson, "Salvamento Manual (Novo Modelo)"]
+      );
+
+      await client.query("COMMIT");
+      res.redirect(`/unidades/${id}?salvo=1`);
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("Erro ao salvar ficha nova:", err.message);
+      return res.status(500).type("text/plain").send("Erro interno ao salvar. Nada foi gravado.");
+    } finally {
+      client.release();
+    }
+    return; // Encerra a execução aqui para não cair na lógica antiga
+  }
+
+  // --- LÓGICA DO MODELO ANTIGO (QUILL) ---
   const conteudo_html = String(req.body.conteudo_html || "");
   const versaoQueAbri = Number(req.body.versao_que_abri) || 0;
   const forcar = String(req.body.forcar || "") === "1";
 
   const erros = [];
-
-  const fr = await pool.query(
-    `SELECT id, conteudo_html, versao_atual
-       FROM fichas WHERE aula_id = $1`,
-    [id]
-  );
-  const ficha = fr.rows.length > 0 ? fr.rows[0] : null;
-  if (!ficha) {
-    erros.push("Ficha não encontrada para esta aula.");
-  }
 
   async function renderizarEditorComErros(mensagens, conflitoAtivo) {
     const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
@@ -573,10 +641,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
       erros: mensagens,
       conflito: conflitoAtivo
     });
-  }
-
-  if (erros.length > 0) {
-    return renderizarEditorComErros(erros, null);
   }
 
   if (!forcar && versaoQueAbri > 0 && versaoQueAbri !== ficha.versao_atual) {
@@ -760,7 +824,7 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
   }
 
   const fr = await pool.query(
-    "SELECT id, versao_atual FROM fichas WHERE aula_id = $1",
+    "SELECT id, versao_atual, modelo FROM fichas WHERE aula_id = $1",
     [id]
   );
   if (fr.rows.length === 0) {
@@ -783,29 +847,63 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const updateR = await client.query(
-      `UPDATE fichas
-          SET conteudo_html = $1,
-              versao_atual = versao_atual + 1,
-              atualizado_em = now()
-        WHERE id = $2
-        RETURNING versao_atual`,
-      [versao.conteudo_html, ficha.id]
-    );
+    if (ficha.modelo === "novo") {
+      // Restauração para o modelo novo (extrai os campos do JSON salvo no histórico)
+      let dadosRestaurados = { problema: "", mapa: "", apresentacao: "" };
+      try {
+        dadosRestaurados = JSON.parse(versao.conteudo_html);
+      } catch (e) {
+        // Se falhar o parse, mantém vazio
+      }
 
-    const novaVersao = updateR.rows[0].versao_atual;
+      const updateR = await client.query(
+        `UPDATE fichas
+            SET problema = $1, mapa = $2, apresentacao = $3,
+                versao_atual = versao_atual + 1, atualizado_em = now()
+          WHERE id = $4
+          RETURNING versao_atual`,
+        [dadosRestaurados.problema, dadosRestaurados.mapa, dadosRestaurados.apresentacao, ficha.id]
+      );
 
-    await client.query(
-      `INSERT INTO fichas_versoes
-         (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia)
-       VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
-      [
-        ficha.id,
-        novaVersao,
-        versao.conteudo_html,
-        `Restauração da v${versao.numero_versao}`
-      ]
-    );
+      const novaVersao = updateR.rows[0].versao_atual;
+
+      await client.query(
+        `INSERT INTO fichas_versoes
+           (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia)
+         VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
+        [
+          ficha.id,
+          novaVersao,
+          versao.conteudo_html, // O JSON restaurado
+          `Restauração da v${versao.numero_versao} (Novo Modelo)`
+        ]
+      );
+    } else {
+      // Restauração para o modelo antigo (Quill)
+      const updateR = await client.query(
+        `UPDATE fichas
+            SET conteudo_html = $1,
+                versao_atual = versao_atual + 1,
+                atualizado_em = now()
+          WHERE id = $2
+          RETURNING versao_atual`,
+        [versao.conteudo_html, ficha.id]
+      );
+
+      const novaVersao = updateR.rows[0].versao_atual;
+
+      await client.query(
+        `INSERT INTO fichas_versoes
+           (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia)
+         VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
+        [
+          ficha.id,
+          novaVersao,
+          versao.conteudo_html,
+          `Restauração da v${versao.numero_versao}`
+        ]
+      );
+    }
 
     await client.query("COMMIT");
     res.redirect(`/unidades/${id}?salvo=1`);
@@ -2441,12 +2539,14 @@ app.get("/unidades/:id", async (req, res) => {
 
   let ficha = null;
   if (unidade.tipo === "aula") {
-    const fr = await pool.query(
-      `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em
+  
+        const fr = await pool.query(
+         `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, mapa, apresentacao
          FROM fichas
         WHERE aula_id = $1`,
       [id]
     );
+
     if (fr.rows.length > 0) {
       ficha = fr.rows[0];
     }

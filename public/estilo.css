@@ -874,3 +874,39 @@ body { padding-top: 3.4rem; }
   margin-top: 0.1rem; 
   order: 2; /* Força a tag a ficar na direita */
 }
+
+/* --- Justificar textos das fichas novas --- */
+.ficha-conteudo {
+  text-align: justify;
+  hyphens: auto; /* Melhora a quebra de palavras em telas pequenas */
+}
+
+/* Garante que os títulos dentro da ficha não fiquem justificados (títulos alinhados à esquerda ficam melhores) */
+.ficha-conteudo h3 {
+  text-align: left;
+}
+
+/* --- Justificar descrições, perguntas norteadoras e caminhos --- */
+.unidade-descricao,
+.aviso-vazio,
+.caminho {
+  text-align: justify;
+  hyphens: auto;
+}
+
+/* Garante que os links de caminho não fiquem com espaçamento estranho */
+.caminho a {
+  text-align: left;
+}
+/* --- Justificar textos de descrição e perguntas --- */
+.unidade-descricao,
+.aviso-vazio,
+.ficha-conteudo {
+  text-align: justify;
+  hyphens: auto;
+}
+
+/* Títulos das fichas alinhados à esquerda */
+.ficha-conteudo h3 {
+  text-align: left;
+}
