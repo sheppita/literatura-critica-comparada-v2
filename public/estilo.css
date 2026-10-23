@@ -910,3 +910,77 @@ body { padding-top: 3.4rem; }
 .ficha-conteudo h3 {
   text-align: left;
 }
+
+/* --- Painel de Controle (Infos) --- */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.dashboard-card {
+  background: #fffdf7;
+  border: 1px solid var(--creme-escuro);
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(90, 60, 40, 0.05);
+  border-top: 4px solid var(--terracota);
+}
+
+.dashboard-card h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  color: var(--marrom);
+  border-bottom: 1px solid var(--creme-escuro);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.dash-total {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--terracota);
+  margin: 0 0 1rem 0;
+  line-height: 1;
+}
+
+.dash-total span {
+  font-size: 1rem;
+  color: var(--texto-suave);
+  font-weight: 500;
+}
+
+.dash-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dash-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.4rem 0;
+  border-bottom: 1px dashed var(--creme-escuro);
+  font-size: 0.95rem;
+}
+
+.dash-list li:last-child {
+  border-bottom: none;
+}
+
+.dash-list span {
+  color: var(--texto-suave);
+}
+
+.dash-list strong {
+  color: var(--marrom);
+  font-weight: 700;
+}
+
+.dash-note {
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  margin-top: 1rem;
+  font-style: italic;
+}

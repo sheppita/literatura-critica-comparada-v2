@@ -3068,6 +3068,83 @@ app.get("/unidades/:id/temas/importar", async (req, res) => {
 });
 // ----- Fim da tela de importação -----
 
+app.get("/infos", async (req, res) => {
+  try {
+    // 1. Contagem da Ementa (Unidades)
+    const ementaR = await pool.query(`
+      SELECT tipo, COUNT(*)::int AS total 
+        FROM unidades 
+       WHERE arquivada = false 
+       GROUP BY tipo
+    `);
+    
+    // Transforma o resultado num objeto fácil (ex: { eixo: 2, disciplina: 5, ... })
+    const ementa = { eixo: 0, disciplina: 0, tema: 0, aula: 0 };
+    ementaR.rows.forEach(row => { ementa[row.tipo] = row.total; });
+
+    // 2. Contagem da Bibliografia
+    const obrasR = await pool.query("SELECT COUNT(*)::int AS total FROM obras WHERE arquivada = false");
+    const autoresR = await pool.query(`
+      SELECT COUNT(DISTINCT oa.nome)::int AS total 
+        FROM obras_autores oa
+        JOIN obras o ON o.id = oa.obra_id
+       WHERE o.arquivada = false
+    `);
+    const edicoesR = await pool.query(`
+      SELECT COUNT(*)::int AS total 
+        FROM edicoes e
+        JOIN obras o ON o.id = e.obra_id
+       WHERE o.arquivada = false
+    `);
+    
+    // 3. Contagem de Usos (Obras nas aulas)
+    const usosR = await pool.query("SELECT COUNT(*)::int AS total FROM usos");
+    
+    // Contagem de usos validados vs a avaliar (simplificado)
+    const usosValidadosR = await pool.query("SELECT COUNT(*)::int AS total FROM usos WHERE validado_em IS NOT NULL");
+
+    // 4. Contagem de Fichas (por modelo)
+    const fichasR = await pool.query(`
+      SELECT modelo, COUNT(*)::int AS total 
+        FROM fichas 
+       GROUP BY modelo
+    `);
+    const fichas = { antigo: 0, novo: 0 };
+    fichasR.rows.forEach(row => { fichas[row.modelo || 'antigo'] = row.total; });
+
+    // Monta o pacote de dados para enviar para a tela
+    const dados = {
+      ementa: {
+        eixos: ementa.eixo,
+        disciplinas: ementa.disciplina,
+        temas: ementa.tema,
+        aulas: ementa.aula,
+        total: ementa.eixo + ementa.disciplina + ementa.tema + ementa.aula
+      },
+      bibliografia: {
+        obras: obrasR.rows[0].total,
+        autores: autoresR.rows[0].total,
+        edicoes: edicoesR.rows[0].total,
+        usos: usosR.rows[0].total,
+        usos_validados: usosValidadosR.rows[0].total
+      },
+      fichas: {
+        antigas: fichas.antigo,
+        novas: fichas.novo,
+        total: fichas.antigo + fichas.novo
+      }
+    };
+
+    res.render("infos", {
+      titulo: "Infos — Painel de Controle",
+      dados
+    });
+  } catch (err) {
+    console.error("Erro na página de infos:", err.message);
+    res.status(500).type("text/plain").send("Erro ao carregar as estatísticas.");
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor ouvindo em http://localhost:${PORT}`);
 });

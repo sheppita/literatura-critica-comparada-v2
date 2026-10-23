@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %></title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <%- include('./partials/navbar') %>
+
+  <p class="caminho"><a href="/">Início</a> › Infos</p>
+
+  <h1>Painel de Controle</h1>
+  <p class="subtitulo">Estatísticas gerais do acervo e da ementa</p>
+
+  <div class="dashboard-grid">
+    
+    <!-- CARD: EMENTA -->
+    <div class="dashboard-card">
+      <h2>Ementa Curricular</h2>
+      <p class="dash-total"><%= dados.ementa.total %> <span>itens totais</span></p>
+      <ul class="dash-list">
+        <li><span>Eixos:</span> <strong><%= dados.ementa.eixos %></strong></li>
+        <li><span>Disciplinas:</span> <strong><%= dados.ementa.disciplinas %></strong></li>
+        <li><span>Temas:</span> <strong><%= dados.ementa.temas %></strong></li>
+        <li><span>Aulas:</span> <strong><%= dados.ementa.aulas %></strong></li>
+      </ul>
+    </div>
+
+    <!-- CARD: BIBLIOGRAFIA -->
+    <div class="dashboard-card">
+      <h2>Bibliografia</h2>
+      <p class="dash-total"><%= dados.bibliografia.obras %> <span>obras ativas</span></p>
+      <ul class="dash-list">
+        <li><span>Autores distintos:</span> <strong><%= dados.bibliografia.autores %></strong></li>
+        <li><span>Edições cadastradas:</span> <strong><%= dados.bibliografia.edicoes %></strong></li>
+        <li><span>Indicações de uso:</span> <strong><%= dados.bibliografia.usos %></strong></li>
+        <li><span>Usos validados:</span> <strong><%= dados.bibliografia.usos_validados %></strong></li>
+      </ul>
+    </div>
+
+    <!-- CARD: FICHAS -->
+    <div class="dashboard-card">
+      <h2>Fichas de Aula</h2>
+      <p class="dash-total"><%= dados.fichas.total %> <span>fichas no total</span></p>
+      <ul class="dash-list">
+        <li><span>Modelo Antigo (Quill):</span> <strong><%= dados.fichas.antigas %></strong></li>
+        <li><span>Modelo Novo (Campos):</span> <strong><%= dados.fichas.novas %></strong></li>
+      </ul>
+      <p class="dash-note">O modelo novo está sendo aplicado gradativamente nas novas aulas.</p>
+    </div>
+
+  </div>
+
+  <%- include('./partials/botoes-flutuantes') %>
+</body>
+</html>
