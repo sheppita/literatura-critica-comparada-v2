@@ -416,10 +416,27 @@ app.get("/unidades/:id/excluir", async (req, res) => {
     [id]
   );
   
-  filhosR.rows.sort((a, b) => {
-    const numA = parseInt(String(a.titulo).replace(/^(\d+).*/, '$1')) || 9999;
-    const numB = parseInt(String(b.titulo).replace(/^(\d+).*/, '$1')) || 9999;
-    if (numA !== numB) return numA - numB;
+    filhosR.rows.sort((a, b) => {
+    // Separa o título em partes numéricas (ex: "1.10 - Texto" vira ["1", "10"])
+    function extrairNumeros(titulo) {
+      const match = String(titulo).match(/^(\d+(?:\.\d+)*)/);
+      if (!match) return [9999]; // Se não começar com número, joga pro final
+      return match[1].split('.').map(Number);
+    }
+
+    const numsA = extrairNumeros(a.titulo);
+    const numsB = extrairNumeros(b.titulo);
+
+    // Compara cada pedaço do número (ex: primeiro o "1", depois o "10" vs "2")
+    for (let i = 0; i < Math.max(numsA.length, numsB.length); i++) {
+      const numA = numsA[i] || 0;
+      const numB = numsB[i] || 0;
+      if (numA !== numB) {
+        return numA - numB;
+      }
+    }
+    
+    // Se os números forem iguais, ordena alfabeticamente pelo título
     return String(a.titulo).localeCompare(String(b.titulo));
   });
 
@@ -2530,12 +2547,26 @@ app.get("/unidades/:id", async (req, res) => {
 
   // ORDENAÇÃO CORRETA NO JAVASCRIPT (Extrai o número do início do título)
   filhosR.rows.sort((a, b) => {
-    const numA = parseInt(String(a.titulo).replace(/^(\d+).*/, '$1')) || 9999;
-    const numB = parseInt(String(b.titulo).replace(/^(\d+).*/, '$1')) || 9999;
-    
-    if (numA !== numB) {
-      return numA - numB;
+    // Separa o título em partes numéricas (ex: "1.10 - Texto" vira ["1", "10"])
+    function extrairNumeros(titulo) {
+      const match = String(titulo).match(/^(\d+(?:\.\d+)*)/);
+      if (!match) return [9999]; // Se não começar com número, joga pro final
+      return match[1].split('.').map(Number);
     }
+
+    const numsA = extrairNumeros(a.titulo);
+    const numsB = extrairNumeros(b.titulo);
+
+    // Compara cada pedaço do número (ex: primeiro o "1", depois o "10" vs "2")
+    for (let i = 0; i < Math.max(numsA.length, numsB.length); i++) {
+      const numA = numsA[i] || 0;
+      const numB = numsB[i] || 0;
+      if (numA !== numB) {
+        return numA - numB;
+      }
+    }
+    
+    // Se os números forem iguais, ordena alfabeticamente pelo título
     return String(a.titulo).localeCompare(String(b.titulo));
   });
 
