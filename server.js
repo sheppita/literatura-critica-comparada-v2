@@ -200,7 +200,7 @@ app.post("/unidades/nova", async (req, res) => {
   const tipo = String(req.body.tipo || "").trim();
   const superiorId = req.body.superior_id ? Number(req.body.superior_id) : null;
   const titulo = String(req.body.titulo || "").trim();
-  const codigo = String(req.body.codigo || "").trim() || null;
+  const codigo = req.body.codigo ? String(req.body.codigo).trim() || null : undefined;
   const descricaoRaw = String(req.body.descricao || "").trim() || null;
   const pergunta = String(req.body.pergunta_norteadora || "").trim() || null;
 
@@ -342,7 +342,7 @@ app.post("/unidades/:id/editar", async (req, res) => {
   const atual = r.rows[0];
 
   const titulo = String(req.body.titulo || "").trim();
-  const codigo = String(req.body.codigo || "").trim() || null;
+  const codigo = req.body.codigo ? String(req.body.codigo).trim() || null : undefined;
   const descricaoRaw = String(req.body.descricao || "").trim() || null;
   const pergunta = String(req.body.pergunta_norteadora || "").trim() || null;
 
@@ -412,9 +412,16 @@ app.get("/unidades/:id/excluir", async (req, res) => {
   const u = r.rows[0];
 
   const filhosR = await pool.query(
-    "SELECT id, tipo, titulo FROM unidades WHERE superior_id = $1 AND arquivada = false ORDER BY ordem, id",
+    "SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 AND arquivada = false",
     [id]
   );
+  
+  filhosR.rows.sort((a, b) => {
+    const numA = parseInt(String(a.titulo).replace(/^(\d+).*/, '$1')) || 9999;
+    const numB = parseInt(String(b.titulo).replace(/^(\d+).*/, '$1')) || 9999;
+    if (numA !== numB) return numA - numB;
+    return String(a.titulo).localeCompare(String(b.titulo));
+  });
 
   let superior = null;
   if (u.superior_id) {
@@ -578,7 +585,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     const mapa = String(req.body.mapa || "").trim();
     const apresentacao = String(req.body.apresentacao || "").trim();
 
-    // Verifica se algo mudou
     const mudou = ficha.problema !== problema || ficha.mapa !== mapa || ficha.apresentacao !== apresentacao;
     if (!mudou) {
       return res.redirect(`/unidades/${id}?salvo=0`);
@@ -598,8 +604,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
       );
 
       const novaVersao = updateR.rows[0].versao_atual;
-      
-      // Salva o histórico como JSON dentro do conteudo_html para manter compatibilidade
       const historicoJson = JSON.stringify({ problema, mapa, apresentacao });
       
       await client.query(
@@ -618,7 +622,7 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     } finally {
       client.release();
     }
-    return; // Encerra a execução aqui para não cair na lógica antiga
+    return;
   }
 
   // --- LÓGICA DO MODELO ANTIGO (QUILL) ---
@@ -848,13 +852,10 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
     await client.query("BEGIN");
 
     if (ficha.modelo === "novo") {
-      // Restauração para o modelo novo (extrai os campos do JSON salvo no histórico)
       let dadosRestaurados = { problema: "", mapa: "", apresentacao: "" };
       try {
         dadosRestaurados = JSON.parse(versao.conteudo_html);
-      } catch (e) {
-        // Se falhar o parse, mantém vazio
-      }
+      } catch (e) {}
 
       const updateR = await client.query(
         `UPDATE fichas
@@ -874,12 +875,11 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
         [
           ficha.id,
           novaVersao,
-          versao.conteudo_html, // O JSON restaurado
+          versao.conteudo_html,
           `Restauração da v${versao.numero_versao} (Novo Modelo)`
         ]
       );
     } else {
-      // Restauração para o modelo antigo (Quill)
       const updateR = await client.query(
         `UPDATE fichas
             SET conteudo_html = $1,
@@ -2058,17 +2058,14 @@ app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   }
 
   const recortes = [];
-  // Em vez de ler o dropdown que não existe mais, vamos ler apenas o rótulo e a observação
   for (let i = 0; i < rotulos.length; i++) {
     const rotulo = String(rotulos[i] || "").trim() || null;
     const observacao = String(observacoesRec[i] || "").trim() || null;
     
-    // Se estiver totalmente em branco, pula
     if (!rotulo && !observacao) {
       continue;
     }
     
-    // Salva forçando o tipo como 'a_conferir', pois não usamos mais o dropdown
     recortes.push({ rotulo, tipo: 'a_conferir', observacao });
   }
 
@@ -2288,17 +2285,14 @@ app.post("/unidades/:id/usos/novo", async (req, res) => {
   }
 
   const recortes = [];
-  // Em vez de ler o dropdown que não existe mais, vamos ler apenas o rótulo e a observação
   for (let i = 0; i < rotulos.length; i++) {
     const rotulo = String(rotulos[i] || "").trim() || null;
     const observacao = String(observacoesRec[i] || "").trim() || null;
     
-    // Se estiver totalmente em branco, pula
     if (!rotulo && !observacao) {
       continue;
     }
     
-    // Salva forçando o tipo como 'a_conferir', pois não usamos mais o dropdown
     recortes.push({ rotulo, tipo: 'a_conferir', observacao });
   }
 
@@ -2530,18 +2524,28 @@ app.get("/unidades/:id", async (req, res) => {
   const unidade = r.rows[0];
 
   const filhosR = await pool.query(
-    "SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 AND arquivada = false ORDER BY ordem, id",
+    "SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 AND arquivada = false",
     [id]
   );
+
+  // ORDENAÇÃO CORRETA NO JAVASCRIPT (Extrai o número do início do título)
+  filhosR.rows.sort((a, b) => {
+    const numA = parseInt(String(a.titulo).replace(/^(\d+).*/, '$1')) || 9999;
+    const numB = parseInt(String(b.titulo).replace(/^(\d+).*/, '$1')) || 9999;
+    
+    if (numA !== numB) {
+      return numA - numB;
+    }
+    return String(a.titulo).localeCompare(String(b.titulo));
+  });
 
   const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
   const proximo = PROXIMO_NIVEL[unidade.tipo];
 
   let ficha = null;
   if (unidade.tipo === "aula") {
-  
-        const fr = await pool.query(
-         `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, mapa, apresentacao
+    const fr = await pool.query(
+      `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, mapa, apresentacao
          FROM fichas
         WHERE aula_id = $1`,
       [id]
