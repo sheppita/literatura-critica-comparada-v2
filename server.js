@@ -2525,6 +2525,138 @@ app.get("/revisao", async (req, res) => {
   }
 });
 
+// ----- Busca global na ementa -----
+
+app.get("/buscar", async (req, res) => {
+  const q = String(req.query.q || "").trim();
+
+  // Sem termo: mostra a tela vazia
+  if (!q) {
+    return res.render("buscar", {
+      titulo: "Buscar",
+      termo: "",
+      resultados: [],
+      total: 0,
+      buscou: false
+    });
+  }
+
+  const padrao = `%${q}%`;
+
+  try {
+    // Busca em unidades + fichas (LEFT JOIN: aulas sem ficha ainda aparecem)
+    // A CTE recursiva monta o caminho curricular de cada unidade que bateu.
+    const r = await pool.query(
+      `WITH RECURSIVE arvore AS (
+         SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel
+           FROM unidades
+          WHERE arquivada = false
+         UNION ALL
+         SELECT a.raiz_id, u.id, u.titulo, u.superior_id, a.nivel + 1
+           FROM unidades u
+           JOIN arvore a ON u.id = a.superior_id
+       ),
+       caminhos AS (
+         SELECT raiz_id,
+                STRING_AGG(titulo, ' › ' ORDER BY nivel DESC) AS caminho
+           FROM arvore
+          GROUP BY raiz_id
+       )
+       SELECT u.id, u.tipo, u.titulo, u.codigo, u.descricao,
+              u.pergunta_norteadora,
+              f.modelo,
+              f.problema, f.mapa, f.apresentacao, f.conteudo_html,
+              c.caminho
+         FROM unidades u
+         LEFT JOIN fichas f ON f.aula_id = u.id
+         LEFT JOIN caminhos c ON c.raiz_id = u.id
+        WHERE u.arquivada = false
+          AND (
+            u.titulo ILIKE $1
+            OR u.descricao ILIKE $1
+            OR u.pergunta_norteadora ILIKE $1
+            OR f.problema ILIKE $1
+            OR f.mapa ILIKE $1
+            OR f.apresentacao ILIKE $1
+            OR f.conteudo_html ILIKE $1
+          )
+        ORDER BY u.tipo, u.titulo
+        LIMIT 200`,
+      [padrao]
+    );
+
+    // Helper: limpa HTML e extrai um trecho ao redor do termo
+    function extrairTrecho(texto, termo) {
+      if (!texto) return null;
+      // Remove tags HTML (para conteudo_html do Quill)
+      const limpo = String(texto)
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const idx = limpo.toLowerCase().indexOf(termo.toLowerCase());
+      if (idx === -1) return null;
+
+      const inicio = Math.max(0, idx - 60);
+      const fim = Math.min(limpo.length, idx + termo.length + 60);
+      let trecho = limpo.slice(inicio, fim);
+      if (inicio > 0) trecho = "…" + trecho;
+      if (fim < limpo.length) trecho = trecho + "…";
+      return trecho;
+    }
+
+    // Para cada resultado, descobre em qual campo bateu e extrai o trecho
+    const resultados = r.rows.map((u) => {
+      let campo = null;
+      let trecho = null;
+
+      // Prioriza onde bateu: título > descrição > pergunta > ficha
+      if (u.titulo && u.titulo.toLowerCase().includes(q.toLowerCase())) {
+        campo = "Título";
+      } else if (u.descricao && u.descricao.toLowerCase().includes(q.toLowerCase())) {
+        campo = "Descrição";
+        trecho = extrairTrecho(u.descricao, q);
+      } else if (u.pergunta_norteadora && u.pergunta_norteadora.toLowerCase().includes(q.toLowerCase())) {
+        campo = "Pergunta norteadora";
+        trecho = extrairTrecho(u.pergunta_norteadora, q);
+      } else if (u.modelo === "novo") {
+        for (const [k, rotulo] of [["problema", "Problema da aula"], ["mapa", "Mapa conceitual"], ["apresentacao", "Apresentação"]]) {
+          if (u[k] && u[k].toLowerCase().includes(q.toLowerCase())) {
+            campo = rotulo;
+            trecho = extrairTrecho(u[k], q);
+            break;
+          }
+        }
+      } else if (u.conteudo_html && u.conteudo_html.toLowerCase().includes(q.toLowerCase())) {
+        campo = "Conteúdo da ficha";
+        trecho = extrairTrecho(u.conteudo_html, q);
+      }
+
+      return {
+        ...u,
+        campo,
+        trecho,
+        rotuloTipo: ROTULO_TIPO[u.tipo] || u.tipo
+      };
+    });
+
+    res.render("buscar", {
+      titulo: `Busca: ${q}`,
+      termo: q,
+      resultados,
+      total: resultados.length,
+      buscou: true
+    });
+  } catch (err) {
+    console.error("Erro na busca:", err.message);
+    res.status(500).type("text/plain").send("Erro ao buscar. Tente novamente.");
+  }
+});
+
 app.get("/unidades/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {

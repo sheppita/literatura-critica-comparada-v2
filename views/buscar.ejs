@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> — Literatura Crítica Comparada</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <%- include('./partials/navbar') %>
+
+  <p class="caminho">
+    <a href="/">Início</a> › Busca
+  </p>
+
+  <h1>Busca na Ementa</h1>
+
+  <% if (!buscou) { %>
+    <p class="aviso-vazio">
+      Digite um termo no campo de busca acima para procurar em toda a ementa
+      (títulos, descrições, perguntas norteadoras e conteúdo das fichas).
+    </p>
+  <% } else if (total === 0) { %>
+    <p class="aviso-vazio">
+      Nenhum resultado para <strong>"<%= termo %>"</strong>.
+    </p>
+  <% } else { %>
+    <p class="contador-resultados">
+      <strong><%= total %></strong> resultado<%= total === 1 ? '' : 's' %>
+      para <strong>"<%= termo %>"</strong>.
+    </p>
+
+    <ul class="lista-busca">
+      <% for (const r of resultados) { %>
+        <li class="busca-item">
+          <div class="busca-cabecalho">
+            <span class="chip chip-suave"><%= r.rotuloTipo %></span>
+            <% if (r.codigo) { %>
+              <span class="busca-codigo"><%= r.codigo %></span>
+            <% } %>
+          </div>
+          <div class="busca-titulo">
+            <a href="/unidades/<%= r.id %>"><%= r.titulo %></a>
+          </div>
+          <% if (r.caminho) { %>
+            <div class="caminho-uso"><%= r.caminho %></div>
+          <% } %>
+          <% if (r.campo) { %>
+            <div class="detalhe-suave">
+              <em>Encontrado em: <%= r.campo %></em>
+              <% if (r.trecho) { %>
+                — <%= r.trecho %>
+              <% } %>
+            </div>
+          <% } %>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+
+  <%- include('./partials/botoes-flutuantes') %>
+</body>
+</html>

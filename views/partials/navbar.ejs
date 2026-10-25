@@ -1,12 +1,31 @@
 <nav class="navbar">
   <div class="navbar-conteudo">
     <a href="/" class="navbar-logo">Literatura Crítica Comparada</a>
+    
     <div class="navbar-links">
       <a href="/">Home</a>
       <a href="/obras">Bibliografia</a>
       <a href="/revisao">Revisão</a>
       <a href="/obras/nova">+ Obra</a>
       <a href="/infos">Infos</a>
+
+      <!-- Campo de Busca -->
+      <form action="/buscar" method="get" class="navbar-busca" role="search">
+        <input 
+          type="search" 
+          name="q" 
+          placeholder="Buscar…" 
+          value="<%= typeof termo !== 'undefined' ? termo : '' %>" 
+          aria-label="Buscar na ementa"
+        >
+        <button type="submit" aria-label="Buscar">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+      </form>
+      <!-- Fim do Campo de Busca -->
 
       <div class="menu-exportar" id="menu-exportar">
         <button type="button" class="menu-exportar-botao" id="btn-exportar"
