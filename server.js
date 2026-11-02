@@ -2515,12 +2515,9 @@ app.get("/revisao", async (req, res) => {
   }
 });
 
-// ----- Busca global na ementa -----
-
 app.get("/buscar", async (req, res) => {
   const q = String(req.query.q || "").trim();
 
-  // Sem termo: mostra a tela vazia
   if (!q) {
     return res.render("buscar", {
       titulo: "Buscar",
@@ -2534,8 +2531,6 @@ app.get("/buscar", async (req, res) => {
   const padrao = `%${q}%`;
 
   try {
-    // Busca em unidades + fichas (LEFT JOIN: aulas sem ficha ainda aparecem)
-    // A CTE recursiva monta o caminho curricular de cada unidade que bateu.
     const r = await pool.query(
       `WITH RECURSIVE arvore AS (
          SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel
@@ -2575,10 +2570,8 @@ app.get("/buscar", async (req, res) => {
       [padrao]
     );
 
-    // Helper: limpa HTML e extrai um trecho ao redor do termo
     function extrairTrecho(texto, termo) {
       if (!texto) return null;
-      // Remove tags HTML (para conteudo_html do Quill)
       const limpo = String(texto)
         .replace(/<[^>]+>/g, " ")
         .replace(/&nbsp;/g, " ")
@@ -2599,12 +2592,10 @@ app.get("/buscar", async (req, res) => {
       return trecho;
     }
 
-    // Para cada resultado, descobre em qual campo bateu e extrai o trecho
     const resultados = r.rows.map((u) => {
       let campo = null;
       let trecho = null;
 
-      // Prioriza onde bateu: título > descrição > pergunta > ficha
       if (u.titulo && u.titulo.toLowerCase().includes(q.toLowerCase())) {
         campo = "Título";
       } else if (u.descricao && u.descricao.toLowerCase().includes(q.toLowerCase())) {
@@ -2654,7 +2645,7 @@ app.get("/unidades/:id", async (req, res) => {
   }
 
   const r = await pool.query(
-    "SELECT id, tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora FROM unidades WHERE id = $1",
+    "SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora FROM unidades WHERE id = $1",
     [id]
   );
   if (r.rows.length === 0) {
@@ -2667,19 +2658,16 @@ app.get("/unidades/:id", async (req, res) => {
     [id]
   );
 
-  // ORDENAÇÃO CORRETA NO JAVASCRIPT (Extrai o número do início do título)
   filhosR.rows.sort((a, b) => {
-    // Separa o título em partes numéricas (ex: "1.10 - Texto" vira ["1", "10"])
     function extrairNumeros(titulo) {
       const match = String(titulo).match(/^(\d+(?:\.\d+)*)/);
-      if (!match) return [9999]; // Se não começar com número, joga pro final
+      if (!match) return [9999];
       return match[1].split('.').map(Number);
     }
 
     const numsA = extrairNumeros(a.titulo);
     const numsB = extrairNumeros(b.titulo);
 
-    // Compara cada pedaço do número (ex: primeiro o "1", depois o "10" vs "2")
     for (let i = 0; i < Math.max(numsA.length, numsB.length); i++) {
       const numA = numsA[i] || 0;
       const numB = numsB[i] || 0;
@@ -2688,7 +2676,6 @@ app.get("/unidades/:id", async (req, res) => {
       }
     }
     
-    // Se os números forem iguais, ordena alfabeticamente pelo título
     return String(a.titulo).localeCompare(String(b.titulo));
   });
 
@@ -2863,7 +2850,6 @@ app.get("/exportar/livros", async (req, res) => {
       recortesPorUso[r.uso_id].push(r);
     }
 
-    // Caminhos curriculares das aulas
     const aulasIds = [...new Set(usosR.rows.map((u) => u.aula_id))];
     const caminhosPorAula = {};
     if (aulasIds.length > 0) {
@@ -2888,7 +2874,6 @@ app.get("/exportar/livros", async (req, res) => {
       }
     }
 
-    // Monta o JSON agrupado por obra
     const obrasMap = new Map();
     for (const o of obrasR.rows) {
       obrasMap.set(o.id, {
@@ -2899,8 +2884,6 @@ app.get("/exportar/livros", async (req, res) => {
       });
     }
 
-    // Precisamos dos IDs de uso para buscar recortes. A consulta de usos não traz o id.
-    // Refaz a consulta com o id para casar com os recortes.
     const usosComIdR = await pool.query(
       `SELECT u.id AS uso_id, u.obra_id, u.papel, u.modalidade, u.orientacao,
               u.validado_em,
@@ -2974,13 +2957,12 @@ app.get("/exportar/livros", async (req, res) => {
 app.get("/exportar/ementa", async (req, res) => {
   try {
     const unidadesR = await pool.query(
-        `SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora
+      `SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora
          FROM unidades
         WHERE arquivada = false
-        ORDER BY tipo, ordem, id`
+        ORDER BY tipo, id`
     );
 
-    // Mapear por id para montar a árvore
     const porId = new Map();
     for (const u of unidadesR.rows) {
       porId.set(u.id, {
@@ -2989,7 +2971,6 @@ app.get("/exportar/ementa", async (req, res) => {
         codigo: u.codigo || null,
         descricao: u.descricao || null,
         pergunta_norteadora: u.pergunta_norteadora || null,
-        ordem: u.ordem,
         tipo: u.tipo,
         filhos: []
       });
@@ -3000,7 +2981,6 @@ app.get("/exportar/ementa", async (req, res) => {
       if (u.tipo === "eixo") {
         raizes.push(u);
       } else {
-        // Encontrar o pai
         const pai = unidadesR.rows.find((x) => x.id === u.id);
         const paiId = pai ? pai.superior_id : null;
         const paiObj = paiId ? porId.get(paiId) : null;
@@ -3010,14 +2990,12 @@ app.get("/exportar/ementa", async (req, res) => {
       }
     }
 
-    // Função de ordenação
     function ordenarArvore(no) {
-      no.filhos.sort((a, b) => (a.ordem || 0) - (b.ordem || 0) || a.id - b.id);
+      no.filhos.sort((a, b) => (a.id || 0) - (b.id || 0));
       for (const f of no.filhos) ordenarArvore(f);
     }
     for (const r of raizes) ordenarArvore(r);
 
-    // Transformar a árvore em estrutura nomeada
     function converter(no) {
       if (no.tipo === "eixo") {
         return {
@@ -3025,7 +3003,6 @@ app.get("/exportar/ementa", async (req, res) => {
           titulo: no.titulo,
           codigo: no.codigo,
           descricao: no.descricao,
-          ordem: no.ordem,
           disciplinas: no.filhos
             .filter((f) => f.tipo === "disciplina")
             .map(converterDisciplina)
@@ -3040,7 +3017,6 @@ app.get("/exportar/ementa", async (req, res) => {
         titulo: no.titulo,
         codigo: no.codigo,
         descricao: no.descricao,
-        ordem: no.ordem,
         temas: no.filhos.filter((f) => f.tipo === "tema").map(converterTema)
       };
     }
@@ -3051,7 +3027,6 @@ app.get("/exportar/ementa", async (req, res) => {
         titulo: no.titulo,
         codigo: no.codigo,
         pergunta_norteadora: no.pergunta_norteadora,
-        ordem: no.ordem,
         aulas: no.filhos.filter((f) => f.tipo === "aula").map(converterAula)
       };
     }
@@ -3060,8 +3035,7 @@ app.get("/exportar/ementa", async (req, res) => {
       return {
         id: no.id,
         titulo: no.titulo,
-        codigo: no.codigo,
-        ordem: no.ordem
+        codigo: no.codigo
       };
     }
 
@@ -3121,20 +3095,15 @@ app.post("/unidades/:id/temas/importar", express.json({ limit: "5mb" }), async (
     return res.status(400).type("text/plain").send("Só disciplinas recebem temas.");
   }
 
-  // Aceita 3 formatos:
-  // 1) JSON: { temas: [...] } ou [...]
-  // 2) Texto cru vindo do formulário: { texto: "1.1 — Título\n1.2 — Título" }
   let entrada = null;
 
   if (req.body && typeof req.body.texto === "string") {
-    // Formato do formulário: texto cru, uma linha por tema
     const linhas = req.body.texto
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
     entrada = linhas.map((linha) => {
-      // Tenta casar "1.1 — Título" ou "1.1 - Título" ou "1.1. Título"
       const m = linha.match(/^([0-9]+(?:\.[0-9]+)*)\s*[—–\-\.]\s*(.+)$/);
       if (m) {
         return { codigo: m[1].trim(), titulo: m[2].trim() };
@@ -3165,10 +3134,8 @@ app.post("/unidades/:id/temas/importar", express.json({ limit: "5mb" }), async (
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    let ordem = 0; // Variável provisória para não quebrar o loop, mas não vai pro banco
     const criados = [];
     for (const t of temas) {
-      ordem += 1;
       const r = await client.query(
         "INSERT INTO unidades (tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora) VALUES ('tema', $1, $2, $3, NULL, $4) RETURNING id, titulo",
         [t.titulo, t.codigo, id, t.pergunta]
@@ -3223,7 +3190,6 @@ app.get("/unidades/:id/temas/importar", async (req, res) => {
 
 app.get("/infos", async (req, res) => {
   try {
-    // 1. Contagem da Ementa (Unidades)
     const ementaR = await pool.query(`
       SELECT tipo, COUNT(*)::int AS total 
         FROM unidades 
@@ -3231,11 +3197,9 @@ app.get("/infos", async (req, res) => {
        GROUP BY tipo
     `);
     
-    // Transforma o resultado num objeto fácil (ex: { eixo: 2, disciplina: 5, ... })
     const ementa = { eixo: 0, disciplina: 0, tema: 0, aula: 0 };
     ementaR.rows.forEach(row => { ementa[row.tipo] = row.total; });
 
-    // 2. Contagem da Bibliografia
     const obrasR = await pool.query("SELECT COUNT(*)::int AS total FROM obras WHERE arquivada = false");
     const autoresR = await pool.query(`
       SELECT COUNT(DISTINCT oa.nome)::int AS total 
@@ -3250,13 +3214,9 @@ app.get("/infos", async (req, res) => {
        WHERE o.arquivada = false
     `);
     
-    // 3. Contagem de Usos (Obras nas aulas)
     const usosR = await pool.query("SELECT COUNT(*)::int AS total FROM usos");
-    
-    // Contagem de usos validados vs a avaliar (simplificado)
     const usosValidadosR = await pool.query("SELECT COUNT(*)::int AS total FROM usos WHERE validado_em IS NOT NULL");
 
-    // 4. Contagem de Fichas (por modelo)
     const fichasR = await pool.query(`
       SELECT modelo, COUNT(*)::int AS total 
         FROM fichas 
@@ -3265,7 +3225,6 @@ app.get("/infos", async (req, res) => {
     const fichas = { antigo: 0, novo: 0 };
     fichasR.rows.forEach(row => { fichas[row.modelo || 'antigo'] = row.total; });
 
-    // Monta o pacote de dados para enviar para a tela
     const dados = {
       ementa: {
         eixos: ementa.eixo,
