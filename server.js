@@ -148,7 +148,7 @@ function nomeArquivoExportacao(prefixo) {
 app.get("/", async (req, res) => {
   try {
     const r = await pool.query(
-      "SELECT id, titulo, codigo FROM unidades WHERE tipo = 'eixo' AND arquivada = false ORDER BY ordem, id"
+      "SELECT id, titulo, codigo FROM unidades WHERE tipo = 'eixo' AND arquivada = false ORDER BY id"
     );
     res.render("inicio", {
       titulo: "Literatura Crítica Comparada",
@@ -250,22 +250,12 @@ app.post("/unidades/nova", async (req, res) => {
     });
   }
 
-  const ordemR = await pool.query(
-    `SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima
-       FROM unidades
-      WHERE tipo = $1
-        AND superior_id IS NOT DISTINCT FROM $2
-        AND arquivada = false`,
-    [tipo, superiorId]
-  );
-  const ordem = ordemR.rows[0].proxima;
-
   const insertR = await pool.query(
     `INSERT INTO unidades
-       (tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+       (tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING id`,
-    [tipo, titulo, codigo, superiorId, ordem, descricao, pergunta]
+    [tipo, titulo, codigo, superiorId, descricao, pergunta]
   );
 
   if (tipo === "aula") {
@@ -2984,7 +2974,7 @@ app.get("/exportar/livros", async (req, res) => {
 app.get("/exportar/ementa", async (req, res) => {
   try {
     const unidadesR = await pool.query(
-      `SELECT id, tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora
+        `SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora
          FROM unidades
         WHERE arquivada = false
         ORDER BY tipo, ordem, id`
@@ -3175,17 +3165,13 @@ app.post("/unidades/:id/temas/importar", express.json({ limit: "5mb" }), async (
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const ordemR = await client.query(
-      "SELECT COALESCE(MAX(ordem), 0) AS ultima FROM unidades WHERE tipo = 'tema' AND superior_id = $1 AND arquivada = false",
-      [id]
-    );
-    let ordem = ordemR.rows[0].ultima;
+    let ordem = 0; // Variável provisória para não quebrar o loop, mas não vai pro banco
     const criados = [];
     for (const t of temas) {
       ordem += 1;
       const r = await client.query(
-        "INSERT INTO unidades (tipo, titulo, codigo, superior_id, ordem, descricao, pergunta_norteadora) VALUES ('tema', $1, $2, $3, $4, NULL, $5) RETURNING id, titulo, ordem",
-        [t.titulo, t.codigo, id, ordem, t.pergunta]
+        "INSERT INTO unidades (tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora) VALUES ('tema', $1, $2, $3, NULL, $4) RETURNING id, titulo",
+        [t.titulo, t.codigo, id, t.pergunta]
       );
       criados.push(r.rows[0]);
     }
