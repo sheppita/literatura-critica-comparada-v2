@@ -131,7 +131,6 @@ async function cadeiaDeSuperiores(id) {
   return cadeia;
 }
 
-// Exportação: helper para gerar o nome do arquivo com timestamp
 function nomeArquivoExportacao(prefixo) {
   const agora = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -407,17 +406,15 @@ app.get("/unidades/:id/excluir", async (req, res) => {
   );
   
     filhosR.rows.sort((a, b) => {
-    // Separa o título em partes numéricas (ex: "1.10 - Texto" vira ["1", "10"])
     function extrairNumeros(titulo) {
       const match = String(titulo).match(/^(\d+(?:\.\d+)*)/);
-      if (!match) return [9999]; // Se não começar com número, joga pro final
+      if (!match) return [9999];
       return match[1].split('.').map(Number);
     }
 
     const numsA = extrairNumeros(a.titulo);
     const numsB = extrairNumeros(b.titulo);
 
-    // Compara cada pedaço do número (ex: primeiro o "1", depois o "10" vs "2")
     for (let i = 0; i < Math.max(numsA.length, numsB.length); i++) {
       const numA = numsA[i] || 0;
       const numB = numsB[i] || 0;
@@ -426,7 +423,6 @@ app.get("/unidades/:id/excluir", async (req, res) => {
       }
     }
     
-    // Se os números forem iguais, ordena alfabeticamente pelo título
     return String(a.titulo).localeCompare(String(b.titulo));
   });
 
@@ -508,7 +504,7 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
   }
 
   const fr = await pool.query(
-    `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, mapa, apresentacao
+    `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, apresentacao
        FROM fichas WHERE aula_id = $1`,
     [id]
   );
@@ -527,7 +523,6 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
     };
   }
 
-  // Se for o modelo novo, renderiza o editor novo
   if (ficha.modelo === "novo") {
     return res.render("ficha-editor-novo", {
       titulo: `Editar Ficha — ${unidade.titulo}`,
@@ -536,14 +531,12 @@ app.get("/unidades/:id/ficha/editar", async (req, res) => {
       cadeia,
       valores: {
         problema: ficha.problema || "",
-        mapa: ficha.mapa || "",
         apresentacao: ficha.apresentacao || ""
       },
       erros: []
     });
   }
 
-  // Se não, segue o fluxo antigo (Quill)
   res.render("ficha-editor", {
     titulo: `Editar Ficha — ${unidade.titulo}`,
     unidade,
@@ -576,7 +569,7 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
   }
 
   const fr = await pool.query(
-    `SELECT id, conteudo_html, versao_atual, modelo, problema, mapa, apresentacao
+    `SELECT id, conteudo_html, versao_atual, modelo, problema, apresentacao
        FROM fichas WHERE aula_id = $1`,
     [id]
   );
@@ -586,13 +579,11 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     return res.status(404).type("text/plain").send("Ficha não encontrada para esta aula.");
   }
 
-  // --- LÓGICA DO NOVO MODELO ---
   if (ficha.modelo === "novo") {
     const problema = String(req.body.problema || "").trim();
-    const mapa = String(req.body.mapa || "").trim();
     const apresentacao = String(req.body.apresentacao || "").trim();
 
-    const mudou = ficha.problema !== problema || ficha.mapa !== mapa || ficha.apresentacao !== apresentacao;
+    const mudou = ficha.problema !== problema || ficha.apresentacao !== apresentacao;
     if (!mudou) {
       return res.redirect(`/unidades/${id}?salvo=0`);
     }
@@ -603,15 +594,15 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
 
       const updateR = await client.query(
         `UPDATE fichas
-            SET problema = $1, mapa = $2, apresentacao = $3,
+            SET problema = $1, apresentacao = $2,
                 versao_atual = versao_atual + 1, atualizado_em = now()
-          WHERE id = $4
+          WHERE id = $3
           RETURNING versao_atual`,
-        [problema, mapa, apresentacao, ficha.id]
+        [problema, apresentacao, ficha.id]
       );
 
       const novaVersao = updateR.rows[0].versao_atual;
-      const historicoJson = JSON.stringify({ problema, mapa, apresentacao });
+      const historicoJson = JSON.stringify({ problema, apresentacao });
       
       await client.query(
         `INSERT INTO fichas_versoes
@@ -632,7 +623,6 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
     return;
   }
 
-  // --- LÓGICA DO MODELO ANTIGO (QUILL) ---
   const conteudo_html = String(req.body.conteudo_html || "");
   const versaoQueAbri = Number(req.body.versao_que_abri) || 0;
   const forcar = String(req.body.forcar || "") === "1";
@@ -859,18 +849,18 @@ app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
     await client.query("BEGIN");
 
     if (ficha.modelo === "novo") {
-      let dadosRestaurados = { problema: "", mapa: "", apresentacao: "" };
+      let dadosRestaurados = { problema: "", apresentacao: "" };
       try {
         dadosRestaurados = JSON.parse(versao.conteudo_html);
       } catch (e) {}
 
       const updateR = await client.query(
         `UPDATE fichas
-            SET problema = $1, mapa = $2, apresentacao = $3,
+            SET problema = $1, apresentacao = $2,
                 versao_atual = versao_atual + 1, atualizado_em = now()
-          WHERE id = $4
+          WHERE id = $3
           RETURNING versao_atual`,
-        [dadosRestaurados.problema, dadosRestaurados.mapa, dadosRestaurados.apresentacao, ficha.id]
+        [dadosRestaurados.problema, dadosRestaurados.apresentacao, ficha.id]
       );
 
       const novaVersao = updateR.rows[0].versao_atual;
@@ -1100,7 +1090,8 @@ app.post("/obras/nova", async (req, res) => {
   const titulo = String(req.body.titulo || "").trim();
   const tipo_material = String(req.body.tipo_material || "livro").trim();
   const autoresRaw = String(req.body.autores || "").trim();
-  const paisAutor = String(req.body.pais_autor || "").trim() || null; // NOVO CAMPO
+  const paisAutor = String(req.body.pais_autor || "").trim() || null;
+
   const edicao_editora = String(req.body.edicao_editora || "").trim() || null;
   const edicao_anoRaw = String(req.body.edicao_ano || "").trim();
   const edicao_capa_url = String(req.body.edicao_capa_url || "").trim() || null;
@@ -1137,6 +1128,7 @@ app.post("/obras/nova", async (req, res) => {
         titulo,
         tipo_material,
         autores: autoresRaw,
+        pais_autor: paisAutor || "",
         edicao_editora: edicao_editora || "",
         edicao_ano: edicao_anoRaw,
         edicao_capa_url: edicao_capa_url || ""
@@ -1162,11 +1154,12 @@ app.post("/obras/nova", async (req, res) => {
     );
     const obraId = obraR.rows[0].id;
 
-    for (let i = 0; i < autores.length; i++)
+    for (let i = 0; i < autores.length; i++) {
       await client.query(
         "INSERT INTO obras_autores (obra_id, nome, ordem, pais) VALUES ($1, $2, $3, $4)",
-        [obraId, autores[i], i + 1, paisAutor] // Adicionado o paisAutor
+        [obraId, autores[i], i + 1, paisAutor]
       );
+    }
 
     if (temDadosEdicao) {
       await client.query(
@@ -1192,6 +1185,7 @@ app.post("/obras/nova", async (req, res) => {
         titulo,
         tipo_material,
         autores: autoresRaw,
+        pais_autor: paisAutor || "",
         edicao_editora: edicao_editora || "",
         edicao_ano: edicao_anoRaw,
         edicao_capa_url: edicao_capa_url || ""
@@ -1205,17 +1199,14 @@ app.post("/obras/nova", async (req, res) => {
   }
 });
 
-// Rota para buscar obras no autocomplete
 app.get("/obras/buscar", async (req, res) => {
   try {
     const termo = String(req.query.q || "").trim();
     
-    // Se o termo for muito curto, não busca (evita trazer tudo)
     if (termo.length < 2) {
       return res.json([]);
     }
 
-    // Busca por título ou por autor (usando as tabelas obras e obras_autores)
     const busca = `%${termo}%`;
     const r = await pool.query(
       `SELECT o.id, o.titulo,
@@ -1358,7 +1349,7 @@ app.post("/obras/mesclar", async (req, res) => {
     );
 
     const autoresPerdedora = await client.query(
-      "SELECT nome, ordem FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
+      "SELECT nome, ordem, pais FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
       [perdedoraId]
     );
 
@@ -1375,8 +1366,8 @@ app.post("/obras/mesclar", async (req, res) => {
       );
       if (existe.rows.length === 0) {
         await client.query(
-          "INSERT INTO obras_autores (obra_id, nome, ordem) VALUES ($1, $2, $3)",
-          [vencedoraId, a.nome, proximaOrdem]
+          "INSERT INTO obras_autores (obra_id, nome, ordem, pais) VALUES ($1, $2, $3, $4)",
+          [vencedoraId, a.nome, proximaOrdem, a.pais]
         );
         proximaOrdem++;
       }
@@ -1418,7 +1409,7 @@ app.get("/obras/:id", async (req, res) => {
   const obra = or.rows[0];
 
   const autoresR = await pool.query(
-    "SELECT nome, ordem FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
+    "SELECT nome, ordem, pais FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
     [id]
   );
 
@@ -1547,8 +1538,6 @@ app.get("/obras/:id", async (req, res) => {
   });
 });
 
-// ----- Rotas de edição de obra e edições (R4) -----
-
 app.get("/obras/:id/editar", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -1605,6 +1594,7 @@ app.post("/obras/:id/editar", async (req, res) => {
   const tipo_material = String(req.body.tipo_material || "livro").trim();
   const autoresRaw = String(req.body.autores || "").trim();
   const paisAutor = String(req.body.pais_autor || "").trim() || null;
+
   const erros = [];
   if (!titulo) erros.push("O título da obra é obrigatório.");
   if (!ROTULO_TIPO_MATERIAL[tipo_material]) erros.push("Tipo de material inválido.");
@@ -1624,7 +1614,8 @@ app.post("/obras/:id/editar", async (req, res) => {
       valores: {
         titulo,
         tipo_material,
-        autores: autoresRaw
+        autores: autoresRaw,
+        pais_autor: paisAutor || ""
       },
       erros,
       tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
@@ -2551,7 +2542,7 @@ app.get("/buscar", async (req, res) => {
        SELECT u.id, u.tipo, u.titulo, u.codigo, u.descricao,
               u.pergunta_norteadora,
               f.modelo,
-              f.problema, f.mapa, f.apresentacao, f.conteudo_html,
+              f.problema, f.apresentacao, f.conteudo_html,
               c.caminho
          FROM unidades u
          LEFT JOIN fichas f ON f.aula_id = u.id
@@ -2562,7 +2553,6 @@ app.get("/buscar", async (req, res) => {
             OR u.descricao ILIKE $1
             OR u.pergunta_norteadora ILIKE $1
             OR f.problema ILIKE $1
-            OR f.mapa ILIKE $1
             OR f.apresentacao ILIKE $1
             OR f.conteudo_html ILIKE $1
           )
@@ -2606,7 +2596,7 @@ app.get("/buscar", async (req, res) => {
         campo = "Pergunta norteadora";
         trecho = extrairTrecho(u.pergunta_norteadora, q);
       } else if (u.modelo === "novo") {
-        for (const [k, rotulo] of [["problema", "Problema da aula"], ["mapa", "Mapa conceitual"], ["apresentacao", "Apresentação"]]) {
+        for (const [k, rotulo] of [["problema", "Problema da aula"], ["apresentacao", "Apresentação"]]) {
           if (u[k] && u[k].toLowerCase().includes(q.toLowerCase())) {
             campo = rotulo;
             trecho = extrairTrecho(u[k], q);
@@ -2686,7 +2676,7 @@ app.get("/unidades/:id", async (req, res) => {
   let ficha = null;
   if (unidade.tipo === "aula") {
     const fr = await pool.query(
-      `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, mapa, apresentacao
+      `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, apresentacao
          FROM fichas
         WHERE aula_id = $1`,
       [id]
@@ -2795,8 +2785,6 @@ app.get("/unidades/:id", async (req, res) => {
     nadaMudou
   });
 });
-
-// ----- Rota: exportar livros (JSON) -----
 
 app.get("/exportar/livros", async (req, res) => {
   try {
@@ -2953,8 +2941,6 @@ app.get("/exportar/livros", async (req, res) => {
   }
 });
 
-// ----- Rota: exportar ementa (JSON) -----
-
 app.get("/exportar/ementa", async (req, res) => {
   try {
     const unidadesR = await pool.query(
@@ -3077,7 +3063,6 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// ----- Rota: importar temas em lote (texto cru ou JSON) -----
 app.post("/unidades/:id/temas/importar", express.json({ limit: "5mb" }), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -3157,9 +3142,7 @@ app.post("/unidades/:id/temas/importar", express.json({ limit: "5mb" }), async (
     client.release();
   }
 });
-// ----- Fim da rota de importação de temas -----
 
-// ----- Tela: importar temas em lote -----
 app.get("/unidades/:id/temas/importar", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -3187,11 +3170,9 @@ app.get("/unidades/:id/temas/importar", async (req, res) => {
     erros: []
   });
 });
-// ----- Fim da tela de importação -----
 
 app.get("/infos", async (req, res) => {
   try {
-    // 1. Contagem da Ementa (Unidades)
     const ementaR = await pool.query(`
       SELECT tipo, COUNT(*)::int AS total 
         FROM unidades 
@@ -3202,7 +3183,6 @@ app.get("/infos", async (req, res) => {
     const ementa = { eixo: 0, disciplina: 0, tema: 0, aula: 0 };
     ementaR.rows.forEach(row => { ementa[row.tipo] = row.total; });
 
-    // 2. Contagem da Bibliografia
     const obrasR = await pool.query("SELECT COUNT(*)::int AS total FROM obras WHERE arquivada = false");
     const autoresTotalR = await pool.query(`
       SELECT COUNT(DISTINCT oa.nome)::int AS total 
@@ -3217,11 +3197,9 @@ app.get("/infos", async (req, res) => {
        WHERE o.arquivada = false
     `);
     
-    // 3. Contagem de Usos (Obras nas aulas)
     const usosR = await pool.query("SELECT COUNT(*)::int AS total FROM usos");
     const usosValidadosR = await pool.query("SELECT COUNT(*)::int AS total FROM usos WHERE validado_em IS NOT NULL");
 
-    // 4. TOP 10 AUTORES (que mais aparecem em usos de obras nas aulas)
     const topAutoresR = await pool.query(`
       SELECT oa.nome AS autor, COUNT(u.id)::int AS total_usos
         FROM obras_autores oa
@@ -3233,7 +3211,6 @@ app.get("/infos", async (req, res) => {
        LIMIT 10
     `);
 
-    // 5. TOP 10 PAÍSES (soma dos usos das obras cujo autor é daquele país)
     const topPaisesR = await pool.query(`
       SELECT oa.pais, COUNT(u.id)::int AS total_usos
         FROM obras_autores oa
