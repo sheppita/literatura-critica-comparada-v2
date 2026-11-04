@@ -19,21 +19,14 @@
 
   <div class="filtros-capsula">
     <a href="/obras<%= filtros.q ? '?q=' + encodeURIComponent(filtros.q) : '' %>"
-       class="capsula <%= !filtros.avaliacao && !filtros.estado && !filtros.tipo ? 'capsula-ativa' : '' %>">
+       class="capsula <%= !filtros.avaliacao && !filtros.tipo ? 'capsula-ativa' : '' %>">
       Todas
     </a>
     <a href="/obras?avaliacao=a_avaliar<%= filtros.q ? '&q=' + encodeURIComponent(filtros.q) : '' %>"
        class="capsula <%= filtros.avaliacao === 'a_avaliar' ? 'capsula-ativa' : '' %>">
       A Avaliar
     </a>
-    
-    <!-- Filtro por Estado -->
-    <a href="/obras?estado=incompleta<%= filtros.q ? '&q=' + encodeURIComponent(filtros.q) : '' %>"
-       class="capsula <%= filtros.estado === 'incompleta' ? 'capsula-ativa' : '' %>">
-      Incompletas
-    </a>
 
-    <!-- Filtros por Tipo de Material -->
     <a href="/obras?tipo=livro<%= filtros.q ? '&q=' + encodeURIComponent(filtros.q) : '' %>"
        class="capsula <%= filtros.tipo === 'livro' ? 'capsula-ativa' : '' %>">
       Livros
@@ -53,15 +46,12 @@
       <input type="hidden" name="avaliacao" value="<%= filtros.avaliacao %>">
     <% } %>
 
-    <input type="text" name="q" placeholder="Buscar por título ou autoria..."
-           value="<%= filtros.q %>">
+    <input type="text" name="q" placeholder="Buscar por título ou autoria..." value="<%= filtros.q %>">
 
     <select name="tipo">
       <option value="">Todos os tipos</option>
       <% for (const [valor, rotulo] of tiposMaterial) { %>
-        <option value="<%= valor %>" <%= filtros.tipo === valor ? 'selected' : '' %>>
-          <%= rotulo %>
-        </option>
+        <option value="<%= valor %>" <%= filtros.tipo === valor ? 'selected' : '' %>><%= rotulo %></option>
       <% } %>
     </select>
 
@@ -75,11 +65,7 @@
 
   <% if (obras.length === 0) { %>
     <p class="aviso-vazio">
-      <% if (temFiltro) { %>
-        Nenhuma obra encontrada com esses filtros.
-      <% } else { %>
-        Nenhuma obra cadastrada ainda.
-      <% } %>
+      <% if (temFiltro) { %> Nenhuma obra encontrada com esses filtros. <% } else { %> Nenhuma obra cadastrada ainda. <% } %>
     </p>
   <% } else { %>
     <p class="contador-resultados">
@@ -92,36 +78,25 @@
           <th></th>
           <th>Livros</th>
           <th>Usos</th>
-          <th>Situação</th>
-          <th>Edições</th>
+          <th>Avaliação</th>
         </tr>
       </thead>
       <tbody>
         <% for (const o of obras) { %>
           <tr>
             <td class="celula-capa">
-              <% if (o.capa_url) { %>
-                <img src="<%= o.capa_url %>" alt="" class="miniatura-capa">
-              <% } %>
+              <% if (o.capa_url) { %> <img src="<%= o.capa_url %>" alt="" class="miniatura-capa"> <% } %>
             </td>
             <td>
               <strong><a href="/obras/<%= o.id %>"><%= o.titulo %></a></strong>
-              <% if (o.tem_pendencia) { %>
-                <span class="icone-pendencia" title="Há uso com edição não especificada ou recorte a conferir">⚠</span>
-              <% } %>
-              <% if (o.autores) { %>
-                <div class="detalhe-suave"><%= o.autores %></div>
-              <% } %>
-              <div class="detalhe-suave">
-                <%= o.rotuloTipoMaterial %>
-              </div>
+              <% if (o.autores) { %> <div class="detalhe-suave"><%= o.autores %></div> <% } %>
+              <div class="detalhe-suave"><%= o.rotuloTipoMaterial %></div>
             </td>
             <td>
               <% if (o.total_aulas_distintas === 0) { %>
                 <span class="detalhe-suave">—</span>
               <% } else { %>
-                <%= o.total_aulas_distintas %>
-                aula<%= o.total_aulas_distintas === 1 ? '' : 's' %>
+                <%= o.total_aulas_distintas %> aula<%= o.total_aulas_distintas === 1 ? '' : 's' %>
               <% } %>
             </td>
             <td>
@@ -133,7 +108,6 @@
                 <span class="detalhe-suave">—</span>
               <% } %>
             </td>
-            <td><%= o.total_edicoes %></td>
           </tr>
         <% } %>
       </tbody>

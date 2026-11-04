@@ -53,30 +53,12 @@ const NOME_FILHO_PLURAL = {
 
 const TIPOS_COM_DESCRICAO = ["eixo", "disciplina"];
 
-const ROTULO_ESTADO_TEXTO = {
-  rascunho: "Rascunho",
-  em_revisao: "Em Revisão",
-  consolidada: "Consolidada"
-};
-
-const ROTULO_ESTADO_BIBLIOGRAFIA = {
-  pendente: "Pendente",
-  em_conferencia: "Em Conferência",
-  conferida: "Conferida"
-};
-
 const ROTULO_TIPO_MATERIAL = {
   livro: "Livro",
   artigo: "Artigo",
   ensaio: "Ensaio",
   revista: "Revista",
   outro: "Outro"
-};
-
-const ROTULO_ESTADO_VERIFICACAO = {
-  pendente: "Pendente",
-  verificada: "Verificada",
-  incompleta: "Incompleta"
 };
 
 const ROTULO_PAPEL = {
@@ -110,9 +92,7 @@ function rotuloTipoOuOmissao(tipo, codigo) {
   if (!codigo) return rotulo;
   const codigoUpper = String(codigo).toUpperCase();
   const rotuloUpper = String(rotulo).toUpperCase();
-  if (codigoUpper.startsWith(rotuloUpper)) {
-    return null;
-  }
+  if (codigoUpper.startsWith(rotuloUpper)) return null;
   return rotulo;
 }
 
@@ -134,21 +114,17 @@ async function cadeiaDeSuperiores(id) {
 function nomeArquivoExportacao(prefixo) {
   const agora = new Date();
   const pad = (n) => String(n).padStart(2, "0");
-  const timestamp =
-    agora.getFullYear() +
-    pad(agora.getMonth() + 1) +
-    pad(agora.getDate()) +
-    "-" +
-    pad(agora.getHours()) +
-    pad(agora.getMinutes());
+  const timestamp = agora.getFullYear() + pad(agora.getMonth() + 1) + pad(agora.getDate()) + "-" + pad(agora.getHours()) + pad(agora.getMinutes());
   return `${prefixo}-${timestamp}.json`;
 }
 
+// ==========================================
+// EMENTA (EIXO, DISCIPLINA, TEMA, AULA)
+// ==========================================
+
 app.get("/", async (req, res) => {
   try {
-    const r = await pool.query(
-      "SELECT id, titulo, codigo FROM unidades WHERE tipo = 'eixo' AND arquivada = false ORDER BY id"
-    );
+    const r = await pool.query("SELECT id, titulo, codigo FROM unidades WHERE tipo = 'eixo' AND arquivada = false ORDER BY id");
     res.render("inicio", {
       titulo: "Literatura Crítica Comparada",
       subtitulo: "Acervo pessoal de curadoria curricular e bibliográfica",
@@ -164,34 +140,19 @@ app.get("/unidades/nova", async (req, res) => {
   const tipo = String(req.query.tipo || "eixo");
   const superiorId = req.query.superior_id ? Number(req.query.superior_id) : null;
 
-  if (!TIPOS_VALIDOS.includes(tipo)) {
-    return res.status(400).type("text/plain").send("Tipo inválido.");
-  }
+  if (!TIPOS_VALIDOS.includes(tipo)) return res.status(400).type("text/plain").send("Tipo inválido.");
 
   let superior = null;
   if (superiorId) {
-    const r = await pool.query(
-      "SELECT id, tipo, titulo FROM unidades WHERE id = $1",
-      [superiorId]
-    );
-    if (r.rows.length === 0) {
-      return res.status(404).type("text/plain").send("Unidade superior não encontrada.");
-    }
+    const r = await pool.query("SELECT id, tipo, titulo FROM unidades WHERE id = $1", [superiorId]);
+    if (r.rows.length === 0) return res.status(404).type("text/plain").send("Unidade superior não encontrada.");
     superior = r.rows[0];
   }
 
   res.render("unidade-form", {
-    titulo: ROTULO_NOVO[tipo],
-    tipo,
-    rotuloTipo: ROTULO_TIPO[tipo],
-    rotuloNovo: ROTULO_NOVO[tipo],
-    superior,
-    valores: { titulo: "", codigo: "", descricao: "", pergunta_norteadora: "" },
-    erros: [],
-    modo: "criar",
-    acao: "/unidades/nova",
-    cancelarUrl: superior ? `/unidades/${superior.id}` : "/",
-    aceitaDescricao: aceitaDescricao(tipo)
+    titulo: ROTULO_NOVO[tipo], tipo, rotuloTipo: ROTULO_TIPO[tipo], rotuloNovo: ROTULO_NOVO[tipo], superior,
+    valores: { titulo: "", codigo: "", descricao: "", pergunta_norteadora: "" }, erros: [], modo: "criar", acao: "/unidades/nova",
+    cancelarUrl: superior ? `/unidades/${superior.id}` : "/", aceitaDescricao: aceitaDescricao(tipo)
   });
 });
 
@@ -204,22 +165,17 @@ app.post("/unidades/nova", async (req, res) => {
   const pergunta = String(req.body.pergunta_norteadora || "").trim() || null;
 
   const descricao = aceitaDescricao(tipo) ? descricaoRaw : null;
-
   const erros = [];
+  
   if (!TIPOS_VALIDOS.includes(tipo)) erros.push("Tipo inválido.");
   if (!titulo) erros.push("O título é obrigatório.");
   if (tipo !== "tema" && pergunta) erros.push("Pergunta norteadora só existe em tema.");
-  if (!aceitaDescricao(tipo) && descricaoRaw) {
-    erros.push("Este nível não aceita descrição.");
-  }
+  if (!aceitaDescricao(tipo) && descricaoRaw) erros.push("Este nível não aceita descrição.");
   if (tipo === "eixo" && superiorId) erros.push("Eixo não tem unidade superior.");
 
   let superior = null;
   if (superiorId) {
-    const r = await pool.query(
-      "SELECT id, tipo, titulo FROM unidades WHERE id = $1",
-      [superiorId]
-    );
+    const r = await pool.query("SELECT id, tipo, titulo FROM unidades WHERE id = $1", [superiorId]);
     if (r.rows.length === 0) {
       erros.push("Unidade superior não encontrada.");
     } else {
@@ -235,150 +191,80 @@ app.post("/unidades/nova", async (req, res) => {
 
   if (erros.length > 0) {
     return res.status(400).render("unidade-form", {
-      titulo: ROTULO_NOVO[tipo] || "Nova Unidade",
-      tipo,
-      rotuloTipo: ROTULO_TIPO[tipo] || "Unidade",
-      rotuloNovo: ROTULO_NOVO[tipo] || "Nova Unidade",
-      superior,
-      valores: { titulo, codigo: codigo || "", descricao: descricaoRaw || "", pergunta_norteadora: pergunta || "" },
-      erros,
-      modo: "criar",
-      acao: "/unidades/nova",
-      cancelarUrl: superior ? `/unidades/${superior.id}` : "/",
-      aceitaDescricao: aceitaDescricao(tipo)
+      titulo: ROTULO_NOVO[tipo] || "Nova Unidade", tipo, rotuloTipo: ROTULO_TIPO[tipo] || "Unidade", rotuloNovo: ROTULO_NOVO[tipo] || "Nova Unidade", superior,
+      valores: { titulo, codigo: codigo || "", descricao: descricaoRaw || "", pergunta_norteadora: pergunta || "" }, erros, modo: "criar", acao: "/unidades/nova",
+      cancelarUrl: superior ? `/unidades/${superior.id}` : "/", aceitaDescricao: aceitaDescricao(tipo)
     });
   }
 
   const insertR = await pool.query(
-    `INSERT INTO unidades
-       (tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id`,
+    `INSERT INTO unidades (tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
     [tipo, titulo, codigo, superiorId, descricao, pergunta]
   );
 
   if (tipo === "aula") {
-    await pool.query(
-      "INSERT INTO fichas (aula_id, modelo) VALUES ($1, 'novo') ON CONFLICT (aula_id) DO NOTHING",
-      [insertR.rows[0].id]
-    );
+    await pool.query("INSERT INTO fichas (aula_id, modelo) VALUES ($1, 'novo') ON CONFLICT (aula_id) DO NOTHING", [insertR.rows[0].id]);
   }
 
-  if (superiorId) {
-    res.redirect(`/unidades/${superiorId}`);
-  } else {
-    res.redirect("/");
-  }
+  res.redirect(superiorId ? `/unidades/${superiorId}` : "/");
 });
 
 app.get("/unidades/:id/editar", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).type("text/plain").send("Id inválido.");
 
-  const r = await pool.query(
-    "SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const r = await pool.query("SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora FROM unidades WHERE id = $1", [id]);
+  if (r.rows.length === 0) return res.status(404).type("text/plain").send("Unidade não encontrada.");
   const u = r.rows[0];
 
   let superior = null;
   if (u.superior_id) {
-    const s = await pool.query(
-      "SELECT id, tipo, titulo FROM unidades WHERE id = $1",
-      [u.superior_id]
-    );
+    const s = await pool.query("SELECT id, tipo, titulo FROM unidades WHERE id = $1", [u.superior_id]);
     if (s.rows.length > 0) superior = s.rows[0];
   }
 
   res.render("unidade-form", {
-    titulo: `Editar ${ROTULO_TIPO[u.tipo]}`,
-    tipo: u.tipo,
-    rotuloTipo: ROTULO_TIPO[u.tipo],
-    rotuloNovo: ROTULO_NOVO[u.tipo],
-    superior,
-    valores: {
-      titulo: u.titulo,
-      codigo: u.codigo || "",
-      descricao: u.descricao || "",
-      pergunta_norteadora: u.pergunta_norteadora || ""
-    },
-    erros: [],
-    modo: "editar",
-    acao: `/unidades/${u.id}/editar`,
-    cancelarUrl: `/unidades/${u.id}`,
-    aceitaDescricao: aceitaDescricao(u.tipo)
+    titulo: `Editar ${ROTULO_TIPO[u.tipo]}`, tipo: u.tipo, rotuloTipo: ROTULO_TIPO[u.tipo], rotuloNovo: ROTULO_NOVO[u.tipo], superior,
+    valores: { titulo: u.titulo, codigo: u.codigo || "", descricao: u.descricao || "", pergunta_norteadora: u.pergunta_norteadora || "" }, erros: [], modo: "editar",
+    acao: `/unidades/${u.id}/editar`, cancelarUrl: `/unidades/${u.id}`, aceitaDescricao: aceitaDescricao(u.tipo)
   });
 });
 
 app.post("/unidades/:id/editar", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).type("text/plain").send("Id inválido.");
 
-  const r = await pool.query(
-    "SELECT id, tipo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const r = await pool.query("SELECT id, tipo, superior_id FROM unidades WHERE id = $1", [id]);
+  if (r.rows.length === 0) return res.status(404).type("text/plain").send("Unidade não encontrada.");
   const atual = r.rows[0];
 
   const titulo = String(req.body.titulo || "").trim();
   const codigo = req.body.codigo ? String(req.body.codigo).trim() || null : undefined;
   const descricaoRaw = String(req.body.descricao || "").trim() || null;
   const pergunta = String(req.body.pergunta_norteadora || "").trim() || null;
-
   const descricao = aceitaDescricao(atual.tipo) ? descricaoRaw : null;
 
   const erros = [];
   if (!titulo) erros.push("O título é obrigatório.");
-  if (atual.tipo !== "tema" && pergunta) {
-    erros.push("Pergunta norteadora só existe em tema.");
-  }
-  if (!aceitaDescricao(atual.tipo) && descricaoRaw) {
-    erros.push("Este nível não aceita descrição.");
-  }
+  if (atual.tipo !== "tema" && pergunta) erros.push("Pergunta norteadora só existe em tema.");
+  if (!aceitaDescricao(atual.tipo) && descricaoRaw) erros.push("Este nível não aceita descrição.");
 
   let superior = null;
   if (atual.superior_id) {
-    const s = await pool.query(
-      "SELECT id, tipo, titulo FROM unidades WHERE id = $1",
-      [atual.superior_id]
-    );
+    const s = await pool.query("SELECT id, tipo, titulo FROM unidades WHERE id = $1", [atual.superior_id]);
     if (s.rows.length > 0) superior = s.rows[0];
   }
 
   if (erros.length > 0) {
     return res.status(400).render("unidade-form", {
-      titulo: `Editar ${ROTULO_TIPO[atual.tipo]}`,
-      tipo: atual.tipo,
-      rotuloTipo: ROTULO_TIPO[atual.tipo],
-      rotuloNovo: ROTULO_NOVO[atual.tipo],
-      superior,
-      valores: { titulo, codigo: codigo || "", descricao: descricaoRaw || "", pergunta_norteadora: pergunta || "" },
-      erros,
-      modo: "editar",
-      acao: `/unidades/${id}/editar`,
-      cancelarUrl: `/unidades/${id}`,
-      aceitaDescricao: aceitaDescricao(atual.tipo)
+      titulo: `Editar ${ROTULO_TIPO[atual.tipo]}`, tipo: atual.tipo, rotuloTipo: ROTULO_TIPO[atual.tipo], rotuloNovo: ROTULO_NOVO[atual.tipo], superior,
+      valores: { titulo, codigo: codigo || "", descricao: descricaoRaw || "", pergunta_norteadora: pergunta || "" }, erros, modo: "editar",
+      acao: `/unidades/${id}/editar`, cancelarUrl: `/unidades/${id}`, aceitaDescricao: aceitaDescricao(atual.tipo)
     });
   }
 
   await pool.query(
-    `UPDATE unidades
-        SET titulo = $1,
-            codigo = $2,
-            descricao = $3,
-            pergunta_norteadora = $4,
-            atualizado_em = now()
-      WHERE id = $5`,
+    `UPDATE unidades SET titulo = $1, codigo = $2, descricao = $3, pergunta_norteadora = $4, atualizado_em = now() WHERE id = $5`,
     [titulo, codigo, descricao, pergunta, id]
   );
 
@@ -387,323 +273,155 @@ app.post("/unidades/:id/editar", async (req, res) => {
 
 app.get("/unidades/:id/excluir", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).type("text/plain").send("Id inválido.");
 
-  const r = await pool.query(
-    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const r = await pool.query("SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1", [id]);
+  if (r.rows.length === 0) return res.status(404).type("text/plain").send("Unidade não encontrada.");
   const u = r.rows[0];
 
-  const filhosR = await pool.query(
-    "SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 AND arquivada = false",
-    [id]
-  );
+  const filhosR = await pool.query("SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 AND arquivada = false", [id]);
   
-    filhosR.rows.sort((a, b) => {
+  filhosR.rows.sort((a, b) => {
     function extrairNumeros(titulo) {
       const match = String(titulo).match(/^(\d+(?:\.\d+)*)/);
       if (!match) return [9999];
       return match[1].split('.').map(Number);
     }
-
     const numsA = extrairNumeros(a.titulo);
     const numsB = extrairNumeros(b.titulo);
-
     for (let i = 0; i < Math.max(numsA.length, numsB.length); i++) {
       const numA = numsA[i] || 0;
       const numB = numsB[i] || 0;
-      if (numA !== numB) {
-        return numA - numB;
-      }
+      if (numA !== numB) return numA - numB;
     }
-    
     return String(a.titulo).localeCompare(String(b.titulo));
   });
 
   let superior = null;
   if (u.superior_id) {
-    const s = await pool.query(
-      "SELECT id, tipo, titulo FROM unidades WHERE id = $1",
-      [u.superior_id]
-    );
+    const s = await pool.query("SELECT id, tipo, titulo FROM unidades WHERE id = $1", [u.superior_id]);
     if (s.rows.length > 0) superior = s.rows[0];
   }
 
-  res.render("unidade-excluir", {
-    titulo: `Excluir ${u.titulo}`,
-    unidade: u,
-    filhos: filhosR.rows,
-    superior,
-    rotuloTipo: ROTULO_TIPO[u.tipo]
-  });
+  res.render("unidade-excluir", { titulo: `Excluir ${u.titulo}`, unidade: u, filhos: filhosR.rows, superior, rotuloTipo: ROTULO_TIPO[u.tipo] });
 });
 
 app.post("/unidades/:id/excluir", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).type("text/plain").send("Id inválido.");
 
-  const r = await pool.query(
-    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const r = await pool.query("SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1", [id]);
+  if (r.rows.length === 0) return res.status(404).type("text/plain").send("Unidade não encontrada.");
   const u = r.rows[0];
 
-  const filhosR = await pool.query(
-    "SELECT id, tipo, titulo FROM unidades WHERE superior_id = $1 AND arquivada = false",
-    [id]
-  );
+  const filhosR = await pool.query("SELECT id FROM unidades WHERE superior_id = $1 AND arquivada = false", [id]);
   if (filhosR.rows.length > 0) {
-    return res.status(400).render("unidade-excluir", {
-      titulo: `Excluir ${u.titulo}`,
-      unidade: u,
-      filhos: filhosR.rows,
-      superior: null,
-      rotuloTipo: ROTULO_TIPO[u.tipo],
-      erro: `Esta unidade tem ${filhosR.rows.length} item(ns) dentro. Remova ou mova os filhos antes de excluir.`
-    });
+    return res.status(400).type("text/plain").send(`Esta unidade tem itens dentro. Remova os filhos antes de excluir.`);
   }
 
   await pool.query("DELETE FROM unidades WHERE id = $1", [id]);
-
-  if (u.superior_id) {
-    res.redirect(`/unidades/${u.superior_id}`);
-  } else {
-    res.redirect("/");
-  }
+  res.redirect(u.superior_id ? `/unidades/${u.superior_id}` : "/");
 });
 
-// ----- Rotas de ficha -----
+// ==========================================
+// FICHAS DE AULA
+// ==========================================
 
 app.get("/unidades/:id/ficha/editar", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const ur = await pool.query(
-    "SELECT id, tipo, titulo, codigo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (ur.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const ur = await pool.query("SELECT id, tipo, titulo, codigo, superior_id FROM unidades WHERE id = $1", [id]);
+  if (ur.rows.length === 0) return res.status(404).type("text/plain").send("Unidade não encontrada.");
   const unidade = ur.rows[0];
-  if (unidade.tipo !== "aula") {
-    return res.status(400).type("text/plain").send("Só aulas têm ficha.");
-  }
+  if (unidade.tipo !== "aula") return res.status(400).type("text/plain").send("Só aulas têm ficha.");
 
-  const fr = await pool.query(
-    `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, apresentacao
-       FROM fichas WHERE aula_id = $1`,
-    [id]
-  );
-  if (fr.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Ficha não encontrada para esta aula.");
-  }
+  const fr = await pool.query(`SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, apresentacao FROM fichas WHERE aula_id = $1`, [id]);
+  if (fr.rows.length === 0) return res.status(404).type("text/plain").send("Ficha não encontrada.");
   const ficha = fr.rows[0];
-
   const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
 
-  let conflito = null;
-  if (req.query.conflito === "1") {
-    conflito = {
-      versaoQueAbri: Number(req.query.versao_que_abri) || 0,
-      versaoAtual: ficha.versao_atual
-    };
-  }
+  let conflito = req.query.conflito === "1" ? { versaoQueAbri: Number(req.query.versao_que_abri) || 0, versaoAtual: ficha.versao_atual } : null;
 
   if (ficha.modelo === "novo") {
     return res.render("ficha-editor-novo", {
-      titulo: `Editar Ficha — ${unidade.titulo}`,
-      unidade,
-      ficha,
-      cadeia,
-      valores: {
-        problema: ficha.problema || "",
-        apresentacao: ficha.apresentacao || ""
-      },
-      erros: []
+      titulo: `Editar Ficha — ${unidade.titulo}`, unidade, ficha, cadeia,
+      valores: { problema: ficha.problema || "", apresentacao: ficha.apresentacao || "" }, erros: []
     });
   }
 
-  res.render("ficha-editor", {
-    titulo: `Editar Ficha — ${unidade.titulo}`,
-    unidade,
-    ficha,
-    cadeia,
-    valores: {
-      conteudo_html: ficha.conteudo_html || ""
-    },
-    erros: [],
-    conflito
-  });
+  res.render("ficha-editor", { titulo: `Editar Ficha — ${unidade.titulo}`, unidade, ficha, cadeia, valores: { conteudo_html: ficha.conteudo_html || "" }, erros: [], conflito });
 });
 
 app.post("/unidades/:id/ficha/editar", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const ur = await pool.query(
-    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (ur.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const ur = await pool.query("SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1", [id]);
+  if (ur.rows.length === 0) return res.status(404).type("text/plain").send("Unidade não encontrada.");
   const unidade = ur.rows[0];
-  if (unidade.tipo !== "aula") {
-    return res.status(400).type("text/plain").send("Só aulas têm ficha.");
-  }
+  if (unidade.tipo !== "aula") return res.status(400).type("text/plain").send("Só aulas têm ficha.");
 
-  const fr = await pool.query(
-    `SELECT id, conteudo_html, versao_atual, modelo, problema, apresentacao
-       FROM fichas WHERE aula_id = $1`,
-    [id]
-  );
+  const fr = await pool.query(`SELECT id, conteudo_html, versao_atual, modelo, problema, apresentacao FROM fichas WHERE aula_id = $1`, [id]);
   const ficha = fr.rows.length > 0 ? fr.rows[0] : null;
-  
-  if (!ficha) {
-    return res.status(404).type("text/plain").send("Ficha não encontrada para esta aula.");
-  }
+  if (!ficha) return res.status(404).type("text/plain").send("Ficha não encontrada.");
 
   if (ficha.modelo === "novo") {
     const problema = String(req.body.problema || "").trim();
     const apresentacao = String(req.body.apresentacao || "").trim();
-
-    const mudou = ficha.problema !== problema || ficha.apresentacao !== apresentacao;
-    if (!mudou) {
-      return res.redirect(`/unidades/${id}?salvo=0`);
-    }
+    if (ficha.problema === problema && ficha.apresentacao === apresentacao) return res.redirect(`/unidades/${id}?salvo=0`);
 
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-
       const updateR = await client.query(
-        `UPDATE fichas
-            SET problema = $1, apresentacao = $2,
-                versao_atual = versao_atual + 1, atualizado_em = now()
-          WHERE id = $3
-          RETURNING versao_atual`,
+        `UPDATE fichas SET problema = $1, apresentacao = $2, versao_atual = versao_atual + 1, atualizado_em = now() WHERE id = $3 RETURNING versao_atual`,
         [problema, apresentacao, ficha.id]
       );
-
       const novaVersao = updateR.rows[0].versao_atual;
       const historicoJson = JSON.stringify({ problema, apresentacao });
-      
       await client.query(
-        `INSERT INTO fichas_versoes
-           (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia)
-         VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
-        [ficha.id, novaVersao, historicoJson, "Salvamento Manual (Novo Modelo)"]
+        `INSERT INTO fichas_versoes (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia) VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
+        [ficha.id, novaVersao, historicoJson, "Salvamento Manual"]
       );
-
       await client.query("COMMIT");
       res.redirect(`/unidades/${id}?salvo=1`);
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("Erro ao salvar ficha nova:", err.message);
-      return res.status(500).type("text/plain").send("Erro interno ao salvar. Nada foi gravado.");
+      console.error("Erro ao salvar ficha:", err.message);
+      res.status(500).type("text/plain").send("Erro interno ao salvar.");
     } finally {
       client.release();
     }
     return;
   }
 
+  // Modelo antigo
   const conteudo_html = String(req.body.conteudo_html || "");
   const versaoQueAbri = Number(req.body.versao_que_abri) || 0;
   const forcar = String(req.body.forcar || "") === "1";
 
-  const erros = [];
-
-  async function renderizarEditorComErros(mensagens, conflitoAtivo) {
-    const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
-    return res.status(400).render("ficha-editor", {
-      titulo: `Editar Ficha — ${unidade.titulo}`,
-      unidade,
-      ficha: ficha || { versao_atual: 1 },
-      cadeia,
-      valores: {
-        conteudo_html
-      },
-      erros: mensagens,
-      conflito: conflitoAtivo
-    });
-  }
-
   if (!forcar && versaoQueAbri > 0 && versaoQueAbri !== ficha.versao_atual) {
-    return renderizarEditorComErros([], {
-      versaoQueAbri,
-      versaoAtual: ficha.versao_atual
-    });
+    return res.status(400).render("ficha-editor", { titulo: `Editar Ficha — ${unidade.titulo}`, unidade, ficha, cadeia: await cadeiaDeSuperiores(unidade.superior_id), valores: { conteudo_html }, erros: [], conflito: { versaoQueAbri, versaoAtual: ficha.versao_atual } });
   }
-
-  const mudou = ficha.conteudo_html !== conteudo_html;
-
-  if (!mudou) {
-    return res.redirect(`/unidades/${id}?salvo=0`);
-  }
+  if (ficha.conteudo_html === conteudo_html) return res.redirect(`/unidades/${id}?salvo=0`);
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
     const updateR = await client.query(
-      `UPDATE fichas
-          SET conteudo_html = $1,
-              versao_atual = versao_atual + 1,
-              atualizado_em = now()
-        WHERE id = $2
-          AND ($3::boolean = true OR versao_atual = $4)
-        RETURNING versao_atual`,
+      `UPDATE fichas SET conteudo_html = $1, versao_atual = versao_atual + 1, atualizado_em = now() WHERE id = $2 AND ($3::boolean = true OR versao_atual = $4) RETURNING versao_atual`,
       [conteudo_html, ficha.id, forcar, ficha.versao_atual]
     );
-
     if (updateR.rows.length === 0) {
       await client.query("ROLLBACK");
-      const frAtual = await pool.query(
-        "SELECT versao_atual FROM fichas WHERE id = $1",
-        [ficha.id]
-      );
-      const versaoAtualAgora = frAtual.rows[0].versao_atual;
-      return renderizarEditorComErros([], {
-        versaoQueAbri,
-        versaoAtual: versaoAtualAgora
-      });
+      return res.status(400).type("text/plain").send("Conflito de versão.");
     }
-
-    const novaVersao = updateR.rows[0].versao_atual;
-    const motivo = forcar ? "Salvamento Forçado (conflito)" : "Salvamento Manual";
-
     await client.query(
-      `INSERT INTO fichas_versoes
-         (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia)
-       VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
-      [ficha.id, novaVersao, conteudo_html, motivo]
+      `INSERT INTO fichas_versoes (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia) VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
+      [ficha.id, updateR.rows[0].versao_atual, conteudo_html, forcar ? "Salvamento Forçado" : "Salvamento Manual"]
     );
-
     await client.query("COMMIT");
     res.redirect(`/unidades/${id}?salvo=1`);
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Erro ao salvar ficha:", err.message);
-    return renderizarEditorComErros(
-      ["Erro interno ao salvar. Nada foi gravado."],
-      null
-    );
+    res.status(500).type("text/plain").send("Erro interno.");
   } finally {
     client.release();
   }
@@ -711,217 +429,75 @@ app.post("/unidades/:id/ficha/editar", async (req, res) => {
 
 app.get("/unidades/:id/ficha/versoes", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const ur = await pool.query(
-    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (ur.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const ur = await pool.query("SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1", [id]);
+  if (ur.rows.length === 0) return res.status(404).type("text/plain").send("Unidade não encontrada.");
   const unidade = ur.rows[0];
-  if (unidade.tipo !== "aula") {
-    return res.status(400).type("text/plain").send("Só aulas têm ficha.");
-  }
+  if (unidade.tipo !== "aula") return res.status(400).type("text/plain").send("Só aulas têm ficha.");
 
-  const fr = await pool.query(
-    "SELECT id, versao_atual FROM fichas WHERE aula_id = $1",
-    [id]
-  );
-  if (fr.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Ficha não encontrada.");
-  }
+  const fr = await pool.query("SELECT id, versao_atual FROM fichas WHERE aula_id = $1", [id]);
+  if (fr.rows.length === 0) return res.status(404).type("text/plain").send("Ficha não encontrada.");
   const ficha = fr.rows[0];
-
-  const versoesR = await pool.query(
-    `SELECT id, numero_versao, motivo, criado_em,
-            LENGTH(conteudo_html) AS tamanho
-       FROM fichas_versoes
-      WHERE ficha_id = $1
-      ORDER BY numero_versao DESC`,
-    [ficha.id]
-  );
-
+  const versoesR = await pool.query(`SELECT id, numero_versao, motivo, criado_em, LENGTH(conteudo_html) AS tamanho FROM fichas_versoes WHERE ficha_id = $1 ORDER BY numero_versao DESC`, [ficha.id]);
   const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
 
-  res.render("ficha-versoes", {
-    titulo: `Histórico — ${unidade.titulo}`,
-    unidade,
-    ficha,
-    cadeia,
-    versoes: versoesR.rows
-  });
+  res.render("ficha-versoes", { titulo: `Histórico — ${unidade.titulo}`, unidade, ficha, cadeia, versoes: versoesR.rows });
 });
 
 app.get("/unidades/:id/ficha/versoes/:numero", async (req, res) => {
   const id = Number(req.params.id);
   const numero = Number(req.params.numero);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(numero) || numero <= 0) {
-    return res.status(400).type("text/plain").send("Id ou número inválido.");
-  }
-
-  const ur = await pool.query(
-    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (ur.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const ur = await pool.query("SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1", [id]);
+  if (ur.rows.length === 0) return res.status(404).type("text/plain").send("Unidade não encontrada.");
   const unidade = ur.rows[0];
-  if (unidade.tipo !== "aula") {
-    return res.status(400).type("text/plain").send("Só aulas têm ficha.");
-  }
-
-  const fr = await pool.query(
-    "SELECT id, versao_atual FROM fichas WHERE aula_id = $1",
-    [id]
-  );
-  if (fr.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Ficha não encontrada.");
-  }
+  
+  const fr = await pool.query("SELECT id, versao_atual FROM fichas WHERE aula_id = $1", [id]);
   const ficha = fr.rows[0];
-
-  const vr = await pool.query(
-    `SELECT id, numero_versao, conteudo_html, motivo, criado_em
-       FROM fichas_versoes
-      WHERE ficha_id = $1 AND numero_versao = $2`,
-    [ficha.id, numero]
-  );
-  if (vr.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Versão não encontrada.");
-  }
-  const versao = vr.rows[0];
-
+  const vr = await pool.query(`SELECT id, numero_versao, conteudo_html, motivo, criado_em FROM fichas_versoes WHERE ficha_id = $1 AND numero_versao = $2`, [ficha.id, numero]);
+  if (vr.rows.length === 0) return res.status(404).type("text/plain").send("Versão não encontrada.");
+  
   const cadeia = await cadeiaDeSuperiores(unidade.superior_id);
-
-  res.render("ficha-versao", {
-    titulo: `Versão v${versao.numero_versao} — ${unidade.titulo}`,
-    unidade,
-    ficha,
-    cadeia,
-    versao
-  });
+  res.render("ficha-versao", { titulo: `Versão v${vr.rows[0].numero_versao} — ${unidade.titulo}`, unidade, ficha, cadeia, versao: vr.rows[0] });
 });
 
 app.post("/unidades/:id/ficha/versoes/:numero/restaurar", async (req, res) => {
   const id = Number(req.params.id);
   const numero = Number(req.params.numero);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(numero) || numero <= 0) {
-    return res.status(400).type("text/plain").send("Id ou número inválido.");
-  }
-
-  const ur = await pool.query(
-    "SELECT id, tipo, titulo FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (ur.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
-  if (ur.rows[0].tipo !== "aula") {
-    return res.status(400).type("text/plain").send("Só aulas têm ficha.");
-  }
-
-  const fr = await pool.query(
-    "SELECT id, versao_atual, modelo FROM fichas WHERE aula_id = $1",
-    [id]
-  );
-  if (fr.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Ficha não encontrada.");
-  }
+  
+  const fr = await pool.query("SELECT id, versao_atual, modelo FROM fichas WHERE aula_id = $1", [id]);
   const ficha = fr.rows[0];
-
-  const vr = await pool.query(
-    `SELECT numero_versao, conteudo_html
-       FROM fichas_versoes
-      WHERE ficha_id = $1 AND numero_versao = $2`,
-    [ficha.id, numero]
-  );
-  if (vr.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Versão não encontrada.");
-  }
+  const vr = await pool.query(`SELECT numero_versao, conteudo_html FROM fichas_versoes WHERE ficha_id = $1 AND numero_versao = $2`, [ficha.id, numero]);
   const versao = vr.rows[0];
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
     if (ficha.modelo === "novo") {
-      let dadosRestaurados = { problema: "", apresentacao: "" };
-      try {
-        dadosRestaurados = JSON.parse(versao.conteudo_html);
-      } catch (e) {}
-
-      const updateR = await client.query(
-        `UPDATE fichas
-            SET problema = $1, apresentacao = $2,
-                versao_atual = versao_atual + 1, atualizado_em = now()
-          WHERE id = $3
-          RETURNING versao_atual`,
-        [dadosRestaurados.problema, dadosRestaurados.apresentacao, ficha.id]
-      );
-
-      const novaVersao = updateR.rows[0].versao_atual;
-
-      await client.query(
-        `INSERT INTO fichas_versoes
-           (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia)
-         VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
-        [
-          ficha.id,
-          novaVersao,
-          versao.conteudo_html,
-          `Restauração da v${versao.numero_versao} (Novo Modelo)`
-        ]
-      );
+      let dados = { problema: "", apresentacao: "" };
+      try { dados = JSON.parse(versao.conteudo_html); } catch (e) {}
+      const up = await client.query(`UPDATE fichas SET problema = $1, apresentacao = $2, versao_atual = versao_atual + 1, atualizado_em = now() WHERE id = $3 RETURNING versao_atual`, [dados.problema, dados.apresentacao, ficha.id]);
+      await client.query(`INSERT INTO fichas_versoes (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia) VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`, [ficha.id, up.rows[0].versao_atual, versao.conteudo_html, `Restauração da v${numero}`]);
     } else {
-      const updateR = await client.query(
-        `UPDATE fichas
-            SET conteudo_html = $1,
-                versao_atual = versao_atual + 1,
-                atualizado_em = now()
-          WHERE id = $2
-          RETURNING versao_atual`,
-        [versao.conteudo_html, ficha.id]
-      );
-
-      const novaVersao = updateR.rows[0].versao_atual;
-
-      await client.query(
-        `INSERT INTO fichas_versoes
-           (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia)
-         VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`,
-        [
-          ficha.id,
-          novaVersao,
-          versao.conteudo_html,
-          `Restauração da v${versao.numero_versao}`
-        ]
-      );
+      const up = await client.query(`UPDATE fichas SET conteudo_html = $1, versao_atual = versao_atual + 1, atualizado_em = now() WHERE id = $2 RETURNING versao_atual`, [versao.conteudo_html, ficha.id]);
+      await client.query(`INSERT INTO fichas_versoes (ficha_id, numero_versao, conteudo_html, motivo, estado_texto, estado_bibliografia) VALUES ($1, $2, $3, $4, 'rascunho', 'pendente')`, [ficha.id, up.rows[0].versao_atual, versao.conteudo_html, `Restauração da v${numero}`]);
     }
-
     await client.query("COMMIT");
     res.redirect(`/unidades/${id}?salvo=1`);
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Erro ao restaurar versão:", err.message);
-    res.status(500).type("text/plain").send("Erro interno ao restaurar. Nada foi alterado.");
+    res.status(500).type("text/plain").send("Erro ao restaurar.");
   } finally {
     client.release();
   }
 });
 
-// ----- Fim das rotas de ficha -----
-
-// ----- Rotas de bibliografia -----
+// ==========================================
+// BIBLIOGRAFIA (OBRAS)
+// ==========================================
 
 app.get("/obras", async (req, res) => {
   try {
     const busca = String(req.query.q || "").trim();
     const tipoFiltro = String(req.query.tipo || "").trim();
-    const estadoFiltro = String(req.query.estado || "").trim();
     const avaliacaoFiltro = String(req.query.avaliacao || "").trim();
 
     const condicoes = [];
@@ -933,10 +509,7 @@ app.get("/obras", async (req, res) => {
       condicoes.push(`(
         o.titulo ILIKE $${p}
         OR o.titulo_original ILIKE $${p}
-        OR EXISTS (
-          SELECT 1 FROM obras_autores oa
-           WHERE oa.obra_id = o.id AND oa.nome ILIKE $${p}
-        )
+        OR EXISTS (SELECT 1 FROM obras_autores oa WHERE oa.obra_id = o.id AND oa.nome ILIKE $${p})
       )`);
     }
 
@@ -945,83 +518,25 @@ app.get("/obras", async (req, res) => {
       condicoes.push(`o.tipo_material = $${params.length}`);
     }
 
-    if (estadoFiltro && ROTULO_ESTADO_VERIFICACAO[estadoFiltro]) {
-      params.push(estadoFiltro);
-      condicoes.push(`o.estado_verificacao = $${params.length}`);
-    }
-
     condicoes.push(`o.arquivada = false`);
 
     if (avaliacaoFiltro === "a_avaliar") {
       condicoes.push(`EXISTS (
-        SELECT 1
-          FROM usos u
-         WHERE u.obra_id = o.id
-           AND (
-             EXISTS (
-               SELECT 1 FROM usos u2
-                WHERE u2.obra_id = u.obra_id
-                  AND u2.aula_id <> u.aula_id
-             )
-           )
-           AND (
-             u.validado_em IS NULL
-             OR EXISTS (
-               SELECT 1 FROM usos u3
-                WHERE u3.obra_id = u.obra_id
-                  AND u3.aula_id <> u.aula_id
-                  AND u3.atualizado_em > u.validado_em
-             )
-           )
+        SELECT 1 FROM usos u WHERE u.obra_id = o.id
+           AND (EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id))
+           AND (u.validado_em IS NULL OR EXISTS (SELECT 1 FROM usos u3 WHERE u3.obra_id = u.obra_id AND u3.aula_id <> u.aula_id AND u3.atualizado_em > u.validado_em))
       )`);
     }
 
     const where = `WHERE ${condicoes.join(" AND ")}`;
 
     const r = await pool.query(
-      `SELECT o.id, o.titulo, o.tipo_material, o.estado_verificacao,
-              COALESCE(
-                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                   FROM obras_autores oa WHERE oa.obra_id = o.id),
-                ''
-              ) AS autores,
-              (SELECT COUNT(*) FROM edicoes e WHERE e.obra_id = o.id) AS total_edicoes,
+      `SELECT o.id, o.titulo, o.tipo_material,
+              COALESCE((SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem) FROM obras_autores oa WHERE oa.obra_id = o.id), '') AS autores,
               (SELECT COUNT(DISTINCT u.aula_id) FROM usos u WHERE u.obra_id = o.id) AS total_aulas_distintas,
-              (
-                SELECT e.capa_url
-                  FROM edicoes e
-                 WHERE e.obra_id = o.id AND e.capa_url IS NOT NULL
-                 ORDER BY e.ano DESC NULLS LAST, e.id DESC
-                 LIMIT 1
-              ) AS capa_url,
-              (
-                SELECT COUNT(*)::int
-                  FROM usos u
-                 WHERE u.obra_id = o.id
-                   AND (
-                     EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id)
-                   )
-                   AND (
-                     u.validado_em IS NULL
-                     OR EXISTS (
-                       SELECT 1 FROM usos u3
-                        WHERE u3.obra_id = u.obra_id
-                          AND u3.aula_id <> u.aula_id
-                          AND u3.atualizado_em > u.validado_em
-                     )
-                   )
-              ) AS usos_a_avaliar,
-              (
-                SELECT COUNT(*)::int
-                  FROM usos u
-                 WHERE u.obra_id = o.id
-              ) AS total_usos,
-              EXISTS (
-                SELECT 1
-                  FROM usos u
-                 WHERE u.obra_id = o.id
-                   AND u.edicao_id IS NULL
-              ) AS tem_pendencia
+              o.capa_url,
+              (SELECT COUNT(*)::int FROM usos u WHERE u.obra_id = o.id AND (EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id)) AND (u.validado_em IS NULL OR EXISTS (SELECT 1 FROM usos u3 WHERE u3.obra_id = u.obra_id AND u3.aula_id <> u.aula_id AND u3.atualizado_em > u.validado_em))) AS usos_a_avaliar,
+              (SELECT COUNT(*)::int FROM usos u WHERE u.obra_id = o.id) AS total_usos
          FROM obras o
          ${where}
         ORDER BY o.titulo`,
@@ -1030,22 +545,14 @@ app.get("/obras", async (req, res) => {
 
     const obras = r.rows.map((o) => ({
       ...o,
-      rotuloTipoMaterial: ROTULO_TIPO_MATERIAL[o.tipo_material] || o.tipo_material,
-      rotuloEstadoVerificacao: ROTULO_ESTADO_VERIFICACAO[o.estado_verificacao] || o.estado_verificacao
+      rotuloTipoMaterial: ROTULO_TIPO_MATERIAL[o.tipo_material] || o.tipo_material
     }));
 
     res.render("obras-lista", {
-      titulo: "Bibliografia",
-      obras,
-      filtros: {
-        q: busca,
-        tipo: tipoFiltro,
-        estado: estadoFiltro,
-        avaliacao: avaliacaoFiltro
-      },
-      temFiltro: Boolean(busca || tipoFiltro || estadoFiltro || avaliacaoFiltro),
-      tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
-      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+      titulo: "Bibliografia", obras,
+      filtros: { q: busca, tipo: tipoFiltro, avaliacao: avaliacaoFiltro },
+      temFiltro: Boolean(busca || tipoFiltro || avaliacaoFiltro),
+      tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL)
     });
   } catch (err) {
     console.error("Erro na lista de obras:", err.message);
@@ -1055,34 +562,9 @@ app.get("/obras", async (req, res) => {
 
 app.get("/obras/nova", (req, res) => {
   res.render("obra-form", {
-    titulo: "Nova Obra",
-    modo: "criar",
-    acao: "/obras/nova",
-    cancelarUrl: "/obras",
-    obraId: null,
-    valores: {
-      titulo: "",
-      titulo_original: "",
-      idioma_original: "",
-      tipo_material: "livro",
-      autores: "",
-      observacoes: "",
-      estado_verificacao: "pendente",
-      edicao_editora: "",
-      edicao_ano: "",
-      edicao_numero: "",
-      edicao_traducao: "",
-      edicao_idioma: "",
-      edicao_isbn: "",
-      edicao_link: "",
-      edicao_capa_url: "",
-      edicao_observacoes: "",
-      edicao_estado: "pendente",
-      incluir_edicao: true
-    },
-    erros: [],
-    tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
-    estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+    titulo: "Nova Obra", modo: "criar", acao: "/obras/nova", cancelarUrl: "/obras", obraId: null,
+    valores: { titulo: "", tipo_material: "livro", autores: "", pais_autor: "", editora: "", capa_url: "" },
+    erros: [], tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL)
   });
 });
 
@@ -1091,66 +573,29 @@ app.post("/obras/nova", async (req, res) => {
   const tipo_material = String(req.body.tipo_material || "livro").trim();
   const autoresRaw = String(req.body.autores || "").trim();
   const paisAutor = String(req.body.pais_autor || "").trim() || null;
-
-  const edicao_editora = String(req.body.edicao_editora || "").trim() || null;
-  const edicao_anoRaw = String(req.body.edicao_ano || "").trim();
-  const edicao_capa_url = String(req.body.edicao_capa_url || "").trim() || null;
+  const editora = String(req.body.editora || "").trim() || null;
+  const capa_url = String(req.body.capa_url || "").trim() || null;
 
   const erros = [];
   if (!titulo) erros.push("O título da obra é obrigatório.");
   if (!ROTULO_TIPO_MATERIAL[tipo_material]) erros.push("Tipo de material inválido.");
 
-  let edicao_ano = null;
-  if (edicao_anoRaw) {
-    const n = Number(edicao_anoRaw);
-    if (!Number.isInteger(n) || n < 1000 || n > 2100) {
-      erros.push("Ano da edição inválido (use um número entre 1000 e 2100).");
-    } else {
-      edicao_ano = n;
-    }
-  }
-
-  const autores = autoresRaw
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
-
-  const temDadosEdicao = Boolean(edicao_editora || edicao_ano || edicao_capa_url);
+  const autores = autoresRaw.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
 
   if (erros.length > 0) {
     return res.status(400).render("obra-form", {
-      titulo: "Nova Obra",
-      modo: "criar",
-      acao: "/obras/nova",
-      cancelarUrl: "/obras",
-      obraId: null,
-      valores: {
-        titulo,
-        tipo_material,
-        autores: autoresRaw,
-        pais_autor: paisAutor || "",
-        edicao_editora: edicao_editora || "",
-        edicao_ano: edicao_anoRaw,
-        edicao_capa_url: edicao_capa_url || ""
-      },
-      erros,
-      tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
-      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+      titulo: "Nova Obra", modo: "criar", acao: "/obras/nova", cancelarUrl: "/obras", obraId: null,
+      valores: { titulo, tipo_material, autores: autoresRaw, pais_autor: paisAutor, editora, capa_url },
+      erros, tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL)
     });
   }
-
-  const estadoObraFinal = autores.length === 0 ? "incompleta" : "pendente";
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
     const obraR = await client.query(
-      `INSERT INTO obras
-         (titulo, tipo_material, estado_verificacao)
-       VALUES ($1, $2, $3)
-       RETURNING id`,
-      [titulo, tipo_material, estadoObraFinal]
+      `INSERT INTO obras (titulo, tipo_material, editora, capa_url) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [titulo, tipo_material, editora, capa_url]
     );
     const obraId = obraR.rows[0].id;
 
@@ -1160,40 +605,12 @@ app.post("/obras/nova", async (req, res) => {
         [obraId, autores[i], i + 1, paisAutor]
       );
     }
-
-    if (temDadosEdicao) {
-      await client.query(
-        `INSERT INTO edicoes
-           (obra_id, editora, ano, capa_url, estado_verificacao)
-         VALUES ($1, $2, $3, $4, 'pendente')`,
-        [obraId, edicao_editora, edicao_ano, edicao_capa_url]
-      );
-    }
-
     await client.query("COMMIT");
     res.redirect("/obras");
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("Erro ao criar obra:", err.message);
-    return res.status(500).render("obra-form", {
-      titulo: "Nova Obra",
-      modo: "criar",
-      acao: "/obras/nova",
-      cancelarUrl: "/obras",
-      obraId: null,
-      valores: {
-        titulo,
-        tipo_material,
-        autores: autoresRaw,
-        pais_autor: paisAutor || "",
-        edicao_editora: edicao_editora || "",
-        edicao_ano: edicao_anoRaw,
-        edicao_capa_url: edicao_capa_url || ""
-      },
-      erros: ["Erro interno ao salvar. Nada foi gravado."],
-      tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
-      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
-    });
+    res.status(500).type("text/plain").send("Erro interno ao salvar.");
   } finally {
     client.release();
   }
@@ -1202,63 +619,23 @@ app.post("/obras/nova", async (req, res) => {
 app.get("/obras/buscar", async (req, res) => {
   try {
     const termo = String(req.query.q || "").trim();
-    
-    if (termo.length < 2) {
-      return res.json([]);
-    }
-
+    if (termo.length < 2) return res.json([]);
     const busca = `%${termo}%`;
     const r = await pool.query(
-      `SELECT o.id, o.titulo,
-              COALESCE(
-                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                   FROM obras_autores oa WHERE oa.obra_id = o.id),
-                ''
-              ) AS autores
-         FROM obras o
-        WHERE o.arquivada = false
-          AND (
-            o.titulo ILIKE $1
-            OR EXISTS (
-              SELECT 1 FROM obras_autores oa
-               WHERE oa.obra_id = o.id AND oa.nome ILIKE $1
-            )
-          )
-        ORDER BY o.titulo
-        LIMIT 12`,
+      `SELECT o.id, o.titulo, COALESCE((SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem) FROM obras_autores oa WHERE oa.obra_id = o.id), '') AS autores
+         FROM obras o WHERE o.arquivada = false AND (o.titulo ILIKE $1 OR EXISTS (SELECT 1 FROM obras_autores oa WHERE oa.obra_id = o.id AND oa.nome ILIKE $1))
+        ORDER BY o.titulo LIMIT 12`,
       [busca]
     );
-
     res.json(r.rows);
   } catch (err) {
-    console.error("Erro na busca de obras:", err.message);
     res.status(500).json({ erro: "Erro ao buscar obras." });
   }
 });
 
 app.get("/obras/mesclar", async (req, res) => {
-  const or = await pool.query(
-    `SELECT o.id, o.titulo,
-            COALESCE(
-              (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                 FROM obras_autores oa WHERE oa.obra_id = o.id),
-              ''
-            ) AS autores
-       FROM obras o
-      WHERE o.arquivada = false
-      ORDER BY o.titulo`
-  );
-
-  res.render("obras-mesclar", {
-    titulo: "Mesclar Obras Duplicadas",
-    obras: or.rows,
-    valores: {
-      vencedora_id: "",
-      perdedora_id: "",
-      confirmacao: ""
-    },
-    erros: []
-  });
+  const or = await pool.query(`SELECT o.id, o.titulo, COALESCE((SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem) FROM obras_autores oa WHERE oa.obra_id = o.id), '') AS autores FROM obras o WHERE o.arquivada = false ORDER BY o.titulo`);
+  res.render("obras-mesclar", { titulo: "Mesclar Obras Duplicadas", obras: or.rows, valores: { vencedora_id: "", perdedora_id: "", confirmacao: "" }, erros: [] });
 });
 
 app.post("/obras/mesclar", async (req, res) => {
@@ -1267,124 +644,45 @@ app.post("/obras/mesclar", async (req, res) => {
   const confirmacao = String(req.body.confirmacao || "").trim();
 
   const erros = [];
+  if (!vencedoraId || !perdedoraId) erros.push("Escolha as duas obras.");
+  if (vencedoraId && perdedoraId && vencedoraId === perdedoraId) erros.push("A obra vencedora e a perdedora não podem ser a mesma.");
 
-  if (!vencedoraId || !perdedoraId) {
-    erros.push("Escolha as duas obras.");
-  }
-  if (vencedoraId && perdedoraId && vencedoraId === perdedoraId) {
-    erros.push("A obra vencedora e a perdedora não podem ser a mesma.");
-  }
-
-  let vencedora = null;
   let perdedora = null;
-
-  if (vencedoraId) {
-    const r = await pool.query(
-      "SELECT id, titulo, arquivada FROM obras WHERE id = $1",
-      [vencedoraId]
-    );
-    if (r.rows.length === 0) {
-      erros.push("Obra vencedora não encontrada.");
-    } else if (r.rows[0].arquivada) {
-      erros.push("A obra vencedora está arquivada.");
-    } else {
-      vencedora = r.rows[0];
-    }
-  }
-
   if (perdedoraId) {
-    const r = await pool.query(
-      "SELECT id, titulo, arquivada FROM obras WHERE id = $1",
-      [perdedoraId]
-    );
-    if (r.rows.length === 0) {
-      erros.push("Obra perdedora não encontrada.");
-    } else if (r.rows[0].arquivada) {
-      erros.push("A obra perdedora já está arquivada.");
-    } else {
-      perdedora = r.rows[0];
-    }
+    const r = await pool.query("SELECT id, titulo, arquivada FROM obras WHERE id = $1", [perdedoraId]);
+    if (r.rows.length === 0) erros.push("Obra perdedora não encontrada.");
+    else if (r.rows[0].arquivada) erros.push("A obra perdedora já está arquivada.");
+    else perdedora = r.rows[0];
   }
-
-  if (perdedora && confirmacao !== perdedora.titulo) {
-    erros.push(`Digite exatamente o título da obra perdedora ("${perdedora.titulo}") para confirmar.`);
-  }
+  if (perdedora && confirmacao !== perdedora.titulo) erros.push(`Digite exatamente o título da obra perdedora para confirmar.`);
 
   if (erros.length > 0) {
-    const or = await pool.query(
-      `SELECT o.id, o.titulo,
-              COALESCE(
-                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                   FROM obras_autores oa WHERE oa.obra_id = o.id),
-                ''
-              ) AS autores
-         FROM obras o
-        WHERE o.arquivada = false
-        ORDER BY o.titulo`
-    );
-    return res.status(400).render("obras-mesclar", {
-      titulo: "Mesclar Obras Duplicadas",
-      obras: or.rows,
-      valores: {
-        vencedora_id: vencedoraId ? String(vencedoraId) : "",
-        perdedora_id: perdedoraId ? String(perdedoraId) : "",
-        confirmacao
-      },
-      erros
-    });
+    const or = await pool.query(`SELECT o.id, o.titulo, COALESCE((SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem) FROM obras_autores oa WHERE oa.obra_id = o.id), '') AS autores FROM obras o WHERE o.arquivada = false ORDER BY o.titulo`);
+    return res.status(400).render("obras-mesclar", { titulo: "Mesclar Obras Duplicadas", obras: or.rows, valores: { vencedora_id: String(vencedoraId || ''), perdedora_id: String(perdedoraId || ''), confirmacao }, erros });
   }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    await client.query(
-      "UPDATE edicoes SET obra_id = $1 WHERE obra_id = $2",
-      [vencedoraId, perdedoraId]
-    );
-
-    await client.query(
-      "UPDATE usos SET obra_id = $1, atualizado_em = now() WHERE obra_id = $2",
-      [vencedoraId, perdedoraId]
-    );
-
-    const autoresPerdedora = await client.query(
-      "SELECT nome, ordem, pais FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
-      [perdedoraId]
-    );
-
-    const maxOrdemR = await client.query(
-      "SELECT COALESCE(MAX(ordem), 0) AS max_ordem FROM obras_autores WHERE obra_id = $1",
-      [vencedoraId]
-    );
+    await client.query("UPDATE usos SET obra_id = $1, atualizado_em = now() WHERE obra_id = $2", [vencedoraId, perdedoraId]);
+    
+    const autoresPerdedora = await client.query("SELECT nome, ordem, pais FROM obras_autores WHERE obra_id = $1 ORDER BY ordem", [perdedoraId]);
+    const maxOrdemR = await client.query("SELECT COALESCE(MAX(ordem), 0) AS max_ordem FROM obras_autores WHERE obra_id = $1", [vencedoraId]);
     let proximaOrdem = maxOrdemR.rows[0].max_ordem + 1;
 
     for (const a of autoresPerdedora.rows) {
-      const existe = await client.query(
-        "SELECT 1 FROM obras_autores WHERE obra_id = $1 AND LOWER(nome) = LOWER($2)",
-        [vencedoraId, a.nome]
-      );
+      const existe = await client.query("SELECT 1 FROM obras_autores WHERE obra_id = $1 AND LOWER(nome) = LOWER($2)", [vencedoraId, a.nome]);
       if (existe.rows.length === 0) {
-        await client.query(
-          "INSERT INTO obras_autores (obra_id, nome, ordem, pais) VALUES ($1, $2, $3, $4)",
-          [vencedoraId, a.nome, proximaOrdem, a.pais]
-        );
+        await client.query("INSERT INTO obras_autores (obra_id, nome, ordem, pais) VALUES ($1, $2, $3, $4)", [vencedoraId, a.nome, proximaOrdem, a.pais]);
         proximaOrdem++;
       }
     }
-
-    await client.query(
-      "UPDATE obras SET arquivada = true, atualizado_em = now() WHERE id = $1",
-      [perdedoraId]
-    );
-
+    await client.query("UPDATE obras SET arquivada = true, atualizado_em = now() WHERE id = $1", [perdedoraId]);
     await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [perdedoraId]);
-
     await client.query("COMMIT");
     res.redirect(`/obras/${vencedoraId}`);
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Erro ao mesclar obras:", err.message);
     res.status(500).type("text/plain").send("Erro interno ao mesclar. Nada foi alterado.");
   } finally {
     client.release();
@@ -1393,1280 +691,328 @@ app.post("/obras/mesclar", async (req, res) => {
 
 app.get("/obras/:id", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const or = await pool.query(
-    `SELECT id, titulo, titulo_original, idioma_original, tipo_material,
-            observacoes, estado_verificacao, arquivada, criado_em, atualizado_em
-       FROM obras WHERE id = $1`,
-    [id]
-  );
-  if (or.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
+  const or = await pool.query(`SELECT id, titulo, titulo_original, idioma_original, tipo_material, observacoes, arquivada, criado_em, atualizado_em, editora, capa_url FROM obras WHERE id = $1`, [id]);
+  if (or.rows.length === 0) return res.status(404).type("text/plain").send("Obra não encontrada.");
   const obra = or.rows[0];
 
-  const autoresR = await pool.query(
-    "SELECT nome, ordem, pais FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
-    [id]
-  );
-
-  const edicoesR = await pool.query(
-    `SELECT id, editora, ano, capa_url
-       FROM edicoes
-      WHERE obra_id = $1
-      ORDER BY ano NULLS LAST, id`,
-    [id]
-  );
-
+  const autoresR = await pool.query("SELECT nome, ordem, pais FROM obras_autores WHERE obra_id = $1 ORDER BY ordem", [id]);
   const usosR = await pool.query(
-    `SELECT u.id, u.papel, u.modalidade, u.orientacao, u.observacoes,
-            u.validado_em, u.criado_em, u.atualizado_em,
-            a.id AS aula_id, a.titulo AS aula_titulo, a.codigo AS aula_codigo,
-            e.id AS edicao_id, e.editora AS edicao_editora, e.ano AS edicao_ano,
-            e.capa_url AS edicao_capa_url,
-            (
-              EXISTS (
-                SELECT 1 FROM usos u2
-                 WHERE u2.obra_id = u.obra_id
-                   AND u2.aula_id <> u.aula_id
-              )
-              AND (
-                u.validado_em IS NULL
-                OR EXISTS (
-                  SELECT 1 FROM usos u3
-                   WHERE u3.obra_id = u.obra_id
-                     AND u3.aula_id <> u.aula_id
-                     AND u3.atualizado_em > u.validado_em
-                )
-              )
-            ) AS a_avaliar
-       FROM usos u
-       JOIN unidades a ON a.id = u.aula_id
-       LEFT JOIN edicoes e ON e.id = u.edicao_id
-      WHERE u.obra_id = $1
-      ORDER BY
-        CASE u.papel
-          WHEN 'texto_base' THEN 1
-          WHEN 'texto_complementar' THEN 2
-          WHEN 'ficcao_ancora' THEN 3
-          WHEN 'ficcao_complementar' THEN 4
-          ELSE 5
-        END,
-        a.titulo`,
-    [id]
-  );
+    `SELECT u.id, u.papel, u.modalidade, u.orientacao, u.observacoes, u.validado_em, u.criado_em, u.atualizado_em, a.id AS aula_id, a.titulo AS aula_titulo, a.codigo AS aula_codigo,
+            (EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id) AND (u.validado_em IS NULL OR EXISTS (SELECT 1 FROM usos u3 WHERE u3.obra_id = u.obra_id AND u3.aula_id <> u.aula_id AND u3.atualizado_em > u.validado_em))) AS a_avaliar
+       FROM usos u JOIN unidades a ON a.id = u.aula_id WHERE u.obra_id = $1
+      ORDER BY CASE u.papel WHEN 'texto_base' THEN 1 WHEN 'texto_complementar' THEN 2 WHEN 'ficcao_ancora' THEN 3 WHEN 'ficcao_complementar' THEN 4 ELSE 5 END, a.titulo`, [id]);
 
   const aulasIds = [...new Set(usosR.rows.map((u) => u.aula_id))];
   const caminhosPorAula = {};
   if (aulasIds.length > 0) {
     const caminhosR = await pool.query(
       `WITH RECURSIVE arvore AS (
-         SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel
-           FROM unidades
-          WHERE id = ANY($1::bigint[])
-         UNION ALL
-         SELECT a.raiz_id, u.id, u.titulo, u.superior_id, a.nivel + 1
-           FROM unidades u
-           JOIN arvore a ON u.id = a.superior_id
-       )
-       SELECT raiz_id,
-              STRING_AGG(titulo, ' › ' ORDER BY nivel DESC) AS caminho
-         FROM arvore
-        GROUP BY raiz_id`,
-      [aulasIds]
+         SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel FROM unidades WHERE id = ANY($1::bigint[])
+         UNION ALL SELECT a.raiz_id, u.id, u.titulo, u.superior_id, a.nivel + 1 FROM unidades u JOIN arvore a ON u.id = a.superior_id
+       ) SELECT raiz_id, STRING_AGG(titulo, ' › ' ORDER BY nivel DESC) AS caminho FROM arvore GROUP BY raiz_id`, [aulasIds]
     );
-    for (const row of caminhosR.rows) {
-      caminhosPorAula[row.raiz_id] = row.caminho;
-    }
+    for (const row of caminhosR.rows) caminhosPorAula[row.raiz_id] = row.caminho;
   }
 
   const usosIds = usosR.rows.map((u) => u.id);
   let recortesPorUso = {};
   if (usosIds.length > 0) {
-    const rr = await pool.query(
-      `SELECT id, uso_id, rotulo, tipo, observacao, ordem
-         FROM usos_recortes
-        WHERE uso_id = ANY($1::bigint[])
-        ORDER BY uso_id, ordem, id`,
-      [usosIds]
-    );
+    const rr = await pool.query(`SELECT id, uso_id, rotulo, tipo, observacao, ordem FROM usos_recortes WHERE uso_id = ANY($1::bigint[]) ORDER BY uso_id, ordem, id`, [usosIds]);
     for (const r of rr.rows) {
       if (!recortesPorUso[r.uso_id]) recortesPorUso[r.uso_id] = [];
       recortesPorUso[r.uso_id].push(r);
     }
   }
 
-  const totalAulasDistintasR = await pool.query(
-    "SELECT COUNT(DISTINCT aula_id)::int AS total FROM usos WHERE obra_id = $1",
-    [id]
-  );
-  const totalAulasDistintas = totalAulasDistintasR.rows[0].total;
-
+  const totalAulasDistintasR = await pool.query("SELECT COUNT(DISTINCT aula_id)::int AS total FROM usos WHERE obra_id = $1", [id]);
+  
   obra.rotuloTipoMaterial = ROTULO_TIPO_MATERIAL[obra.tipo_material] || obra.tipo_material;
-  obra.rotuloEstadoVerificacao =
-    ROTULO_ESTADO_VERIFICACAO[obra.estado_verificacao] || obra.estado_verificacao;
-
-  const edicoes = edicoesR.rows.map((e) => ({
-    ...e,
-    rotuloEstadoVerificacao:
-      ROTULO_ESTADO_VERIFICACAO[e.estado_verificacao] || e.estado_verificacao
-  }));
 
   const usos = usosR.rows.map((u) => ({
-    ...u,
-    recortes: recortesPorUso[u.id] || [],
-    rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
-    rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
-    caminho: caminhosPorAula[u.aula_id] || "",
-    a_avaliar: u.a_avaliar,
-    rotuloEstado: u.a_avaliar ? "A Avaliar" : "Validado"
+    ...u, recortes: recortesPorUso[u.id] || [], rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
+    rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade, caminho: caminhosPorAula[u.aula_id] || "",
+    a_avaliar: u.a_avaliar, rotuloEstado: u.a_avaliar ? "A Avaliar" : "Validado"
   }));
 
-  const salvo = req.query.salvo === "1";
-
-  res.render("obra-detalhe", {
-    titulo: obra.titulo,
-    obra,
-    autores: autoresR.rows,
-    edicoes,
-    usos,
-    totalAulasDistintas,
-    salvo
-  });
+  res.render("obra-detalhe", { titulo: obra.titulo, obra, autores: autoresR.rows, usos, totalAulasDistintas: totalAulasDistintasR.rows[0].total, salvo: req.query.salvo === "1" });
 });
 
 app.get("/obras/:id/editar", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const or = await pool.query(
-    `SELECT id, titulo, tipo_material
-       FROM obras WHERE id = $1`,
-    [id]
-  );
-  if (or.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
+  const or = await pool.query(`SELECT id, titulo, tipo_material, editora, capa_url FROM obras WHERE id = $1`, [id]);
+  if (or.rows.length === 0) return res.status(404).type("text/plain").send("Obra não encontrada.");
   const obra = or.rows[0];
 
-  const autoresR = await pool.query(
-    "SELECT nome, pais FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
-    [id]
-  );
+  const autoresR = await pool.query("SELECT nome, pais FROM obras_autores WHERE obra_id = $1 ORDER BY ordem", [id]);
   const autoresTexto = autoresR.rows.map((a) => a.nome).join("\n");
   const paisAtual = autoresR.rows.length > 0 ? (autoresR.rows[0].pais || "") : "";
 
   res.render("obra-form", {
-    titulo: `Editar Obra`,
-    modo: "editar",
-    acao: `/obras/${id}/editar`,
-    cancelarUrl: `/obras/${id}`,
-    obraId: id,
-    valores: {
-      titulo: obra.titulo,
-      tipo_material: obra.tipo_material,
-      autores: autoresTexto,
-      pais_autor: paisAtual
-    },
-    erros: [],
-    tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
-    estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+    titulo: `Editar Obra`, modo: "editar", acao: `/obras/${id}/editar`, cancelarUrl: `/obras/${id}`, obraId: id,
+    valores: { titulo: obra.titulo, tipo_material: obra.tipo_material, autores: autoresTexto, pais_autor: paisAtual, editora: obra.editora || "", capa_url: obra.capa_url || "" },
+    erros: [], tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL)
   });
 });
 
 app.post("/obras/:id/editar", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
   const or = await pool.query("SELECT id FROM obras WHERE id = $1", [id]);
-  if (or.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
+  if (or.rows.length === 0) return res.status(404).type("text/plain").send("Obra não encontrada.");
 
   const titulo = String(req.body.titulo || "").trim();
   const tipo_material = String(req.body.tipo_material || "livro").trim();
   const autoresRaw = String(req.body.autores || "").trim();
   const paisAutor = String(req.body.pais_autor || "").trim() || null;
+  const editora = String(req.body.editora || "").trim() || null;
+  const capa_url = String(req.body.capa_url || "").trim() || null;
 
   const erros = [];
   if (!titulo) erros.push("O título da obra é obrigatório.");
   if (!ROTULO_TIPO_MATERIAL[tipo_material]) erros.push("Tipo de material inválido.");
-
-  const autores = autoresRaw
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+  const autores = autoresRaw.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
 
   if (erros.length > 0) {
     return res.status(400).render("obra-form", {
-      titulo: "Editar Obra",
-      modo: "editar",
-      acao: `/obras/${id}/editar`,
-      cancelarUrl: `/obras/${id}`,
-      obraId: id,
-      valores: {
-        titulo,
-        tipo_material,
-        autores: autoresRaw,
-        pais_autor: paisAutor || ""
-      },
-      erros,
-      tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
-      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
+      titulo: "Editar Obra", modo: "editar", acao: `/obras/${id}/editar`, cancelarUrl: `/obras/${id}`, obraId: id,
+      valores: { titulo, tipo_material, autores: autoresRaw, pais_autor: paisAutor, editora, capa_url },
+      erros, tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL)
     });
   }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    await client.query(
-      `UPDATE obras
-          SET titulo = $1,
-              tipo_material = $2,
-              atualizado_em = now()
-        WHERE id = $3`,
-      [titulo, tipo_material, id]
-    );
-
+    await client.query(`UPDATE obras SET titulo = $1, tipo_material = $2, editora = $3, capa_url = $4, atualizado_em = now() WHERE id = $5`, [titulo, tipo_material, editora, capa_url, id]);
     await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [id]);
     for (let i = 0; i < autores.length; i++) {
-      await client.query(
-        "INSERT INTO obras_autores (obra_id, nome, ordem, pais) VALUES ($1, $2, $3, $4)",
-        [id, autores[i], i + 1, paisAutor]
-      );
+      await client.query("INSERT INTO obras_autores (obra_id, nome, ordem, pais) VALUES ($1, $2, $3, $4)", [id, autores[i], i + 1, paisAutor]);
     }
-
     await client.query("COMMIT");
     res.redirect(`/obras/${id}?salvo=1`);
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Erro ao editar obra:", err.message);
-    res.status(500).type("text/plain").send("Erro interno ao salvar. Nada foi gravado.");
+    res.status(500).type("text/plain").send("Erro interno ao salvar.");
   } finally {
     client.release();
   }
-});
-
-app.get("/obras/:id/edicoes/nova", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const or = await pool.query("SELECT id, titulo FROM obras WHERE id = $1", [id]);
-  if (or.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
-  const obra = or.rows[0];
-
-  res.render("edicao-form", {
-    titulo: `Nova Edição — ${obra.titulo}`,
-    modo: "criar",
-    acao: `/obras/${id}/edicoes/nova`,
-    cancelarUrl: `/obras/${id}`,
-    obra,
-    valores: {
-      editora: "",
-      ano: "",
-      capa_url: ""
-    },
-    erros: [],
-    estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
-  });
-});
-
-app.post("/obras/:id/edicoes/nova", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const or = await pool.query("SELECT id, titulo FROM obras WHERE id = $1", [id]);
-  if (or.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
-  const obra = or.rows[0];
-
-  const editora = String(req.body.editora || "").trim() || null;
-  const anoRaw = String(req.body.ano || "").trim();
-  const capa_url = String(req.body.capa_url || "").trim() || null;
-
-  const erros = [];
-
-  let ano = null;
-  if (anoRaw) {
-    const n = Number(anoRaw);
-    if (!Number.isInteger(n) || n < 1000 || n > 2100) {
-      erros.push("Ano inválido (use um número entre 1000 e 2100).");
-    } else {
-      ano = n;
-    }
-  }
-
-  if (erros.length > 0) {
-    return res.status(400).render("edicao-form", {
-      titulo: `Nova Edição — ${obra.titulo}`,
-      modo: "criar",
-      acao: `/obras/${id}/edicoes/nova`,
-      cancelarUrl: `/obras/${id}`,
-      obra,
-      valores: { editora: editora || "", ano: anoRaw, capa_url: capa_url || "" },
-      erros,
-      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
-    });
-  }
-
-  await pool.query(
-    `INSERT INTO edicoes
-       (obra_id, editora, ano, capa_url, estado_verificacao)
-     VALUES ($1, $2, $3, $4, 'pendente')`,
-    [id, editora, ano, capa_url]
-  );
-
-  res.redirect(`/obras/${id}?salvo=1`);
-});
-
-app.get("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
-  const id = Number(req.params.id);
-  const edicaoId = Number(req.params.edicao_id);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(edicaoId) || edicaoId <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const or = await pool.query("SELECT id, titulo FROM obras WHERE id = $1", [id]);
-  if (or.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
-  const obra = or.rows[0];
-
-  const er = await pool.query(
-    `SELECT id, editora, ano, capa_url
-       FROM edicoes WHERE id = $1 AND obra_id = $2`,
-    [edicaoId, id]
-  );
-  if (er.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Edição não encontrada.");
-  }
-  const edicao = er.rows[0];
-
-  res.render("edicao-form", {
-    titulo: `Editar Edição — ${obra.titulo}`,
-    modo: "editar",
-    acao: `/obras/${id}/edicoes/${edicaoId}/editar`,
-    cancelarUrl: `/obras/${id}`,
-    obra,
-    valores: {
-      editora: edicao.editora || "",
-      ano: edicao.ano != null ? String(edicao.ano) : "",
-      capa_url: edicao.capa_url || ""
-    },
-    erros: [],
-    estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
-  });
-});
-
-app.post("/obras/:id/edicoes/:edicao_id/editar", async (req, res) => {
-  const id = Number(req.params.id);
-  const edicaoId = Number(req.params.edicao_id);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(edicaoId) || edicaoId <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const or = await pool.query("SELECT id, titulo FROM obras WHERE id = $1", [id]);
-  if (or.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
-  const obra = or.rows[0];
-
-  const er = await pool.query("SELECT id FROM edicoes WHERE id = $1 AND obra_id = $2", [edicaoId, id]);
-  if (er.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Edição não encontrada.");
-  }
-
-  const editora = String(req.body.editora || "").trim() || null;
-  const anoRaw = String(req.body.ano || "").trim();
-  const capa_url = String(req.body.capa_url || "").trim() || null;
-
-  const erros = [];
-
-  let ano = null;
-  if (anoRaw) {
-    const n = Number(anoRaw);
-    if (!Number.isInteger(n) || n < 1000 || n > 2100) {
-      erros.push("Ano inválido (use um número entre 1000 e 2100).");
-    } else {
-      ano = n;
-    }
-  }
-
-  if (erros.length > 0) {
-    return res.status(400).render("edicao-form", {
-      titulo: `Editar Edição — ${obra.titulo}`,
-      modo: "editar",
-      acao: `/obras/${id}/edicoes/${edicaoId}/editar`,
-      cancelarUrl: `/obras/${id}`,
-      obra,
-      valores: { editora: editora || "", ano: anoRaw, capa_url: capa_url || "" },
-      erros,
-      estadosVerificacao: Object.entries(ROTULO_ESTADO_VERIFICACAO)
-    });
-  }
-
-  await pool.query(
-    `UPDATE edicoes
-        SET editora = $1, ano = $2, capa_url = $3, atualizado_em = now()
-      WHERE id = $4`,
-    [editora, ano, capa_url, edicaoId]
-  );
-
-  res.redirect(`/obras/${id}?salvo=1`);
-});
-
-app.post("/obras/:id/edicoes/:edicao_id/excluir", async (req, res) => {
-  const id = Number(req.params.id);
-  const edicaoId = Number(req.params.edicao_id);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(edicaoId) || edicaoId <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const er = await pool.query(
-    "SELECT id FROM edicoes WHERE id = $1 AND obra_id = $2",
-    [edicaoId, id]
-  );
-  if (er.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Edição não encontrada.");
-  }
-
-  const emUsoR = await pool.query(
-    "SELECT COUNT(*)::int AS total FROM usos WHERE edicao_id = $1",
-    [edicaoId]
-  );
-  const emUso = emUsoR.rows[0].total;
-
-  if (emUso > 0) {
-    return res.status(400).type("text/plain").send(
-      `Esta edição está em uso em ${emUso} indicação(ões). Remova ou reatribua os usos antes de excluir.`
-    );
-  }
-
-  await pool.query("DELETE FROM edicoes WHERE id = $1", [edicaoId]);
-
-  res.redirect(`/obras/${id}?salvo=1`);
 });
 
 app.post("/obras/:id/excluir", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const r = await pool.query(
-    "SELECT id, titulo, arquivada FROM obras WHERE id = $1",
-    [id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Obra não encontrada.");
-  }
-  const obra = r.rows[0];
-
-  if (obra.arquivada) {
-    return res.status(400).type("text/plain").send("Esta obra já está arquivada.");
-  }
-
-  const usosR = await pool.query(
-    `SELECT a.id, a.titulo
-       FROM usos u
-       JOIN unidades a ON a.id = u.aula_id
-      WHERE u.obra_id = $1
-      ORDER BY a.titulo`,
-    [id]
-  );
-
-  if (usosR.rows.length > 0) {
-    const titulos = usosR.rows.map((u) => `"${u.titulo}"`).join(", ");
-    return res.status(400).type("text/plain").send(
-      `Esta obra está em uso em ${usosR.rows.length} aula(s): ${titulos}. Remova ou reatribua os usos antes de excluir.`
-    );
-  }
+  const r = await pool.query("SELECT id, titulo, arquivada FROM obras WHERE id = $1", [id]);
+  if (r.rows.length === 0) return res.status(404).type("text/plain").send("Obra não encontrada.");
+  
+  const usosR = await pool.query(`SELECT a.titulo FROM usos u JOIN unidades a ON a.id = u.aula_id WHERE u.obra_id = $1`, [id]);
+  if (usosR.rows.length > 0) return res.status(400).type("text/plain").send("Esta obra está em uso em aulas. Remova os usos antes de excluir.");
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    await client.query("DELETE FROM edicoes WHERE obra_id = $1", [id]);
     await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [id]);
     await client.query("DELETE FROM obras WHERE id = $1", [id]);
-
     await client.query("COMMIT");
     res.redirect("/obras");
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Erro ao excluir obra:", err.message);
-    res.status(500).type("text/plain").send("Erro interno ao excluir. Nada foi alterado.");
+    res.status(500).type("text/plain").send("Erro ao excluir.");
   } finally {
     client.release();
   }
 });
 
-// ----- Rotas de edição de uso (R4) -----
+// ==========================================
+// USOS (OBRA EM AULA)
+// ==========================================
 
 app.get("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   const id = Number(req.params.id);
   const usoId = Number(req.params.uso_id);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(usoId) || usoId <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const ur = await pool.query(
-    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (ur.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const ur = await pool.query("SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1", [id]);
   const aula = ur.rows[0];
-  if (aula.tipo !== "aula") {
-    return res.status(400).type("text/plain").send("Só aulas têm usos.");
-  }
-
-  const usoR = await pool.query(
-    `SELECT id, obra_id, edicao_id, papel, modalidade, orientacao
-       FROM usos WHERE id = $1 AND aula_id = $2`,
-    [usoId, id]
-  );
-  if (usoR.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Uso não encontrado.");
-  }
+  
+  const usoR = await pool.query(`SELECT id, obra_id, papel, modalidade, orientacao FROM usos WHERE id = $1 AND aula_id = $2`, [usoId, id]);
   const uso = usoR.rows[0];
-
-  const or = await pool.query(
-    `SELECT o.id, o.titulo,
-            COALESCE(
-              (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                 FROM obras_autores oa WHERE oa.obra_id = o.id),
-              ''
-            ) AS autores
-       FROM obras o
-      WHERE o.arquivada = false
-      ORDER BY o.titulo`
-  );
-
-  const er = await pool.query(
-    `SELECT id, editora, ano
-       FROM edicoes WHERE obra_id = $1
-      ORDER BY ano NULLS LAST, id`,
-    [uso.obra_id]
-  );
-
-  const rr = await pool.query(
-    `SELECT rotulo, tipo, observacao
-       FROM usos_recortes WHERE uso_id = $1 ORDER BY ordem, id`,
-    [usoId]
-  );
-
-  const recortes = rr.rows.length > 0 ? rr.rows : [
-    { rotulo: "", tipo: "capitulo", observacao: "" }
-  ];
-
+  const or = await pool.query(`SELECT o.id, o.titulo, COALESCE((SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem) FROM obras_autores oa WHERE oa.obra_id = o.id), '') AS autores FROM obras o WHERE o.arquivada = false ORDER BY o.titulo`);
+  const rr = await pool.query(`SELECT rotulo, tipo, observacao FROM usos_recortes WHERE uso_id = $1 ORDER BY ordem, id`, [usoId]);
+  const recortes = rr.rows.length > 0 ? rr.rows : [{ rotulo: "", tipo: "capitulo", observacao: "" }];
   const cadeia = await cadeiaDeSuperiores(aula.superior_id);
 
   res.render("uso-form", {
-    titulo: `Editar Obra — ${aula.titulo}`,
-    aula,
-    cadeia,
-    obras: or.rows,
-    edicoes: er.rows,
-    valores: {
-      obra_id: String(uso.obra_id),
-      edicao_id: uso.edicao_id ? String(uso.edicao_id) : "",
-      papel: uso.papel,
-      modalidade: uso.modalidade,
-      orientacao: uso.orientacao || "",
-      recortes,
-      uso_id: usoId
-    },
-    erros: [],
-    modo: "editar",
-    acao: `/unidades/${id}/usos/${usoId}/editar`,
-    cancelarUrl: `/unidades/${id}`,
-    papeis: Object.entries(ROTULO_PAPEL),
-    modalidades: Object.entries(ROTULO_MODALIDADE),
-    tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
+    titulo: `Editar Obra — ${aula.titulo}`, aula, cadeia, obras: or.rows,
+    valores: { obra_id: String(uso.obra_id), papel: uso.papel, modalidade: uso.modalidade, orientacao: uso.orientacao || "", recortes, uso_id: usoId },
+    erros: [], modo: "editar", acao: `/unidades/${id}/usos/${usoId}/editar`, cancelarUrl: `/unidades/${id}`,
+    papeis: Object.entries(ROTULO_PAPEL), modalidades: Object.entries(ROTULO_MODALIDADE), tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
   });
 });
 
 app.post("/unidades/:id/usos/:uso_id/editar", async (req, res) => {
   const id = Number(req.params.id);
   const usoId = Number(req.params.uso_id);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(usoId) || usoId <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const ur = await pool.query(
-    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (ur.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const ur = await pool.query("SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1", [id]);
   const aula = ur.rows[0];
-  if (aula.tipo !== "aula") {
-    return res.status(400).type("text/plain").send("Só aulas têm usos.");
-  }
-
-  const usoR = await pool.query(
-    "SELECT id FROM usos WHERE id = $1 AND aula_id = $2",
-    [usoId, id]
-  );
-  if (usoR.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Uso não encontrado.");
-  }
 
   const obra_id = Number(req.body.obra_id) || null;
-  const edicao_id = Number(req.body.edicao_id) || null;
   const papel = String(req.body.papel || "").trim();
   const modalidade = String(req.body.modalidade || "").trim();
   const orientacao = String(req.body.orientacao || "").trim() || null;
-
   const rotulos = [].concat(req.body.recorte_rotulo || []);
   const observacoesRec = [].concat(req.body.recorte_observacao || []);
-
-  const erros = [];
-  if (!obra_id) erros.push("Escolha uma obra.");
-  if (!ROTULO_PAPEL[papel]) erros.push("Papel inválido.");
-  if (!ROTULO_MODALIDADE[modalidade]) erros.push("Modalidade inválida.");
-
-  if (obra_id) {
-    const o = await pool.query("SELECT id, arquivada FROM obras WHERE id = $1", [obra_id]);
-    if (o.rows.length === 0) erros.push("Obra não encontrada.");
-    else if (o.rows[0].arquivada) erros.push("Esta obra está arquivada.");
-  }
-
-  if (edicao_id) {
-    const e = await pool.query("SELECT id, obra_id FROM edicoes WHERE id = $1", [edicao_id]);
-    if (e.rows.length === 0) erros.push("Edição não encontrada.");
-    else if (Number(e.rows[0].obra_id) !== Number(obra_id)) erros.push("A edição não pertence à obra selecionada.");
-  }
 
   const recortes = [];
   for (let i = 0; i < rotulos.length; i++) {
     const rotulo = String(rotulos[i] || "").trim() || null;
     const observacao = String(observacoesRec[i] || "").trim() || null;
-    
-    if (!rotulo && !observacao) {
-      continue;
-    }
-    
-    recortes.push({ rotulo, tipo: 'a_conferir', observacao });
-  }
-
-  if (erros.length > 0) {
-    const or = await pool.query(
-      `SELECT o.id, o.titulo,
-              COALESCE(
-                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                   FROM obras_autores oa WHERE oa.obra_id = o.id),
-                ''
-              ) AS autores
-         FROM obras o
-        WHERE o.arquivada = false
-        ORDER BY o.titulo`
-    );
-    let edicoes = [];
-    if (obra_id) {
-      const er = await pool.query(
-        `SELECT id, editora, ano
-           FROM edicoes WHERE obra_id = $1
-          ORDER BY ano NULLS LAST, id`,
-        [obra_id]
-      );
-      edicoes = er.rows;
-    }
-    const cadeia = await cadeiaDeSuperiores(aula.superior_id);
-    return res.status(400).render("uso-form", {
-      titulo: `Editar Obra — ${aula.titulo}`,
-      aula,
-      cadeia,
-      obras: or.rows,
-      edicoes,
-      valores: {
-        obra_id: obra_id ? String(obra_id) : "",
-        edicao_id: edicao_id ? String(edicao_id) : "",
-        papel, modalidade, orientacao: orientacao || "",
-        recortes: recortes.length > 0 ? recortes : [
-          { rotulo: "", tipo: "capitulo", observacao: "" }
-        ],
-        uso_id: usoId
-      },
-      erros,
-      modo: "editar",
-      acao: `/unidades/${id}/usos/${usoId}/editar`,
-      cancelarUrl: `/unidades/${id}`,
-      papeis: Object.entries(ROTULO_PAPEL),
-      modalidades: Object.entries(ROTULO_MODALIDADE),
-      tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
-    });
+    if (rotulo || observacao) recortes.push({ rotulo, tipo: 'a_conferir', observacao });
   }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    await client.query(
-      `UPDATE usos
-          SET obra_id = $1, edicao_id = $2, papel = $3, modalidade = $4,
-              orientacao = $5, atualizado_em = now()
-        WHERE id = $6`,
-      [obra_id, edicao_id, papel, modalidade, orientacao, usoId]
-    );
-
+    await client.query(`UPDATE usos SET obra_id = $1, papel = $2, modalidade = $3, orientacao = $4, atualizado_em = now() WHERE id = $5`, [obra_id, papel, modalidade, orientacao, usoId]);
     await client.query("DELETE FROM usos_recortes WHERE uso_id = $1", [usoId]);
     for (let i = 0; i < recortes.length; i++) {
-      const r = recortes[i];
-      await client.query(
-        `INSERT INTO usos_recortes (uso_id, rotulo, tipo, observacao, ordem)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [usoId, r.rotulo, r.tipo, r.observacao, i + 1]
-      );
+      await client.query(`INSERT INTO usos_recortes (uso_id, rotulo, tipo, observacao, ordem) VALUES ($1, $2, $3, $4, $5)`, [usoId, recortes[i].rotulo, recortes[i].tipo, recortes[i].observacao, i + 1]);
     }
-
     await client.query("COMMIT");
     res.redirect(`/unidades/${id}?salvo=1`);
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Erro ao editar uso:", err.message);
-    res.status(500).type("text/plain").send("Erro interno ao salvar. Nada foi gravado.");
+    res.status(500).type("text/plain").send("Erro interno ao salvar.");
   } finally {
     client.release();
   }
 });
 
-// ----- Rotas de uso (obra em aula) -----
-
 app.get("/unidades/:id/usos/novo", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const ur = await pool.query(
-    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (ur.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const ur = await pool.query("SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1", [id]);
   const aula = ur.rows[0];
-  if (aula.tipo !== "aula") {
-    return res.status(400).type("text/plain").send("Só aulas recebem usos.");
-  }
-
-  const or = await pool.query(
-    `SELECT o.id, o.titulo,
-            COALESCE(
-              (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                 FROM obras_autores oa WHERE oa.obra_id = o.id),
-              ''
-            ) AS autores
-       FROM obras o
-      WHERE o.arquivada = false
-      ORDER BY o.titulo`
-  );
-
+  const or = await pool.query(`SELECT o.id, o.titulo, COALESCE((SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem) FROM obras_autores oa WHERE oa.obra_id = o.id), '') AS autores FROM obras o WHERE o.arquivada = false ORDER BY o.titulo`);
   const obraPre = req.query.obra_id ? Number(req.query.obra_id) : null;
-
-  let edicoes = [];
-  if (obraPre) {
-    const er = await pool.query(
-      `SELECT id, editora, ano
-         FROM edicoes WHERE obra_id = $1
-        ORDER BY ano NULLS LAST, id`,
-      [obraPre]
-    );
-    edicoes = er.rows;
-  }
-
   const cadeia = await cadeiaDeSuperiores(aula.superior_id);
 
   res.render("uso-form", {
-    titulo: `Adicionar Obra — ${aula.titulo}`,
-    aula,
-    cadeia,
-    obras: or.rows,
-    edicoes,
-    valores: {
-      obra_id: obraPre ? String(obraPre) : "",
-      edicao_id: "",
-      papel: "texto_base",
-      modalidade: "parcial",
-      orientacao: "",
-      recortes: [
-        { rotulo: "", tipo: "capitulo", observacao: "" }
-      ]
-    },
-    erros: [],
-    modo: "criar",
-    acao: `/unidades/${id}/usos/novo`,
-    cancelarUrl: `/unidades/${id}`,
-    papeis: Object.entries(ROTULO_PAPEL),
-    modalidades: Object.entries(ROTULO_MODALIDADE),
-    tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
+    titulo: `Adicionar Obra — ${aula.titulo}`, aula, cadeia, obras: or.rows,
+    valores: { obra_id: obraPre ? String(obraPre) : "", papel: "texto_base", modalidade: "parcial", orientacao: "", recortes: [{ rotulo: "", tipo: "capitulo", observacao: "" }] },
+    erros: [], modo: "criar", acao: `/unidades/${id}/usos/novo`, cancelarUrl: `/unidades/${id}`,
+    papeis: Object.entries(ROTULO_PAPEL), modalidades: Object.entries(ROTULO_MODALIDADE), tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
   });
-});
-
-app.get("/obras/:id/edicoes.json", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).json({ erro: "Id inválido." });
-  }
-  const r = await pool.query(
-    `SELECT id, editora, ano, capa_url
-       FROM edicoes WHERE obra_id = $1
-      ORDER BY ano NULLS LAST, id`,
-    [id]
-  );
-  res.json({ edicoes: r.rows });
 });
 
 app.post("/unidades/:id/usos/novo", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const ur = await pool.query(
-    "SELECT id, tipo, titulo, superior_id FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (ur.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
-  const aula = ur.rows[0];
-  if (aula.tipo !== "aula") {
-    return res.status(400).type("text/plain").send("Só aulas recebem usos.");
-  }
-
   const obra_id = Number(req.body.obra_id) || null;
-  const edicao_id = Number(req.body.edicao_id) || null;
   const papel = String(req.body.papel || "").trim();
   const modalidade = String(req.body.modalidade || "").trim();
   const orientacao = String(req.body.orientacao || "").trim() || null;
-
   const rotulos = [].concat(req.body.recorte_rotulo || []);
   const observacoesRec = [].concat(req.body.recorte_observacao || []);
-
-  const erros = [];
-  if (!obra_id) erros.push("Escolha uma obra.");
-  if (!ROTULO_PAPEL[papel]) erros.push("Papel inválido.");
-  if (!ROTULO_MODALIDADE[modalidade]) erros.push("Modalidade inválida.");
-
-  if (obra_id) {
-    const o = await pool.query("SELECT id, arquivada FROM obras WHERE id = $1", [obra_id]);
-    if (o.rows.length === 0) erros.push("Obra não encontrada.");
-    else if (o.rows[0].arquivada) erros.push("Esta obra está arquivada e não pode receber novos usos.");
-  }
-
-  if (edicao_id) {
-    const e = await pool.query("SELECT id, obra_id FROM edicoes WHERE id = $1", [edicao_id]);
-    if (e.rows.length === 0) {
-      erros.push("Edição não encontrada.");
-    } else if (Number(e.rows[0].obra_id) !== Number(obra_id)) {
-      erros.push("A edição não pertence à obra selecionada.");
-    }
-  }
 
   const recortes = [];
   for (let i = 0; i < rotulos.length; i++) {
     const rotulo = String(rotulos[i] || "").trim() || null;
     const observacao = String(observacoesRec[i] || "").trim() || null;
-    
-    if (!rotulo && !observacao) {
-      continue;
-    }
-    
-    recortes.push({ rotulo, tipo: 'a_conferir', observacao });
-  }
-
-  if (erros.length > 0) {
-    const or = await pool.query(
-      `SELECT o.id, o.titulo,
-              COALESCE(
-                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                   FROM obras_autores oa WHERE oa.obra_id = o.id),
-                ''
-              ) AS autores
-         FROM obras o
-        WHERE o.arquivada = false
-        ORDER BY o.titulo`
-    );
-    let edicoes = [];
-    if (obra_id) {
-      const er = await pool.query(
-        `SELECT id, editora, ano
-           FROM edicoes WHERE obra_id = $1
-          ORDER BY ano NULLS LAST, id`,
-        [obra_id]
-      );
-      edicoes = er.rows;
-    }
-    const cadeia = await cadeiaDeSuperiores(aula.superior_id);
-    return res.status(400).render("uso-form", {
-      titulo: `Adicionar Obra — ${aula.titulo}`,
-      aula,
-      cadeia,
-      obras: or.rows,
-      edicoes,
-      valores: {
-        obra_id: obra_id ? String(obra_id) : "",
-        edicao_id: edicao_id ? String(edicao_id) : "",
-        papel, modalidade, orientacao: orientacao || "",
-        recortes: recortes.length > 0 ? recortes : [
-          { rotulo: "", tipo: "capitulo", observacao: "" }
-        ]
-      },
-      erros,
-      modo: "criar",
-      acao: `/unidades/${id}/usos/novo`,
-      cancelarUrl: `/unidades/${id}`,
-      papeis: Object.entries(ROTULO_PAPEL),
-      modalidades: Object.entries(ROTULO_MODALIDADE),
-      tiposRecorte: Object.entries(ROTULO_RECORTE_TIPO)
-    });
+    if (rotulo || observacao) recortes.push({ rotulo, tipo: 'a_conferir', observacao });
   }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    await client.query(
-      `INSERT INTO usos
-         (aula_id, obra_id, edicao_id, papel, modalidade, orientacao)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, obra_id, edicao_id, papel, modalidade, orientacao]
-    );
-
-    const usoR = await client.query(
-      "SELECT id FROM usos WHERE aula_id = $1 AND obra_id = $2 ORDER BY id DESC LIMIT 1",
-      [id, obra_id]
-    );
+    await client.query(`INSERT INTO usos (aula_id, obra_id, papel, modalidade, orientacao) VALUES ($1, $2, $3, $4, $5)`, [id, obra_id, papel, modalidade, orientacao]);
+    const usoR = await client.query("SELECT id FROM usos WHERE aula_id = $1 AND obra_id = $2 ORDER BY id DESC LIMIT 1", [id, obra_id]);
     const usoId = usoR.rows[0].id;
-
     for (let i = 0; i < recortes.length; i++) {
-      const r = recortes[i];
-      await client.query(
-        `INSERT INTO usos_recortes (uso_id, rotulo, tipo, observacao, ordem)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [usoId, r.rotulo, r.tipo, r.observacao, i + 1]
-      );
+      await client.query(`INSERT INTO usos_recortes (uso_id, rotulo, tipo, observacao, ordem) VALUES ($1, $2, $3, $4, $5)`, [usoId, recortes[i].rotulo, recortes[i].tipo, recortes[i].observacao, i + 1]);
     }
-
     await client.query("COMMIT");
     res.redirect(`/unidades/${id}?salvo=1`);
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Erro ao criar uso:", err.message);
-    res.status(500).type("text/plain").send("Erro interno ao salvar. Nada foi gravado.");
+    res.status(500).type("text/plain").send("Erro interno ao salvar.");
   } finally {
     client.release();
   }
 });
 
 app.post("/unidades/:id/usos/:uso_id/excluir", async (req, res) => {
-  const id = Number(req.params.id);
-  const usoId = Number(req.params.uso_id);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(usoId) || usoId <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const r = await pool.query(
-    "SELECT id FROM usos WHERE id = $1 AND aula_id = $2",
-    [usoId, id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Uso não encontrado.");
-  }
-
-  await pool.query("DELETE FROM usos WHERE id = $1", [usoId]);
-
-  res.redirect(`/unidades/${id}?salvo=1`);
+  await pool.query("DELETE FROM usos WHERE id = $1 AND aula_id = $2", [req.params.uso_id, req.params.id]);
+  res.redirect(`/unidades/${req.params.id}?salvo=1`);
 });
 
 app.post("/unidades/:id/usos/:uso_id/validar", async (req, res) => {
-  const id = Number(req.params.id);
-  const usoId = Number(req.params.uso_id);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(usoId) || usoId <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const r = await pool.query(
-    "SELECT id FROM usos WHERE id = $1 AND aula_id = $2",
-    [usoId, id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Uso não encontrado.");
-  }
-
-  await pool.query(
-    "UPDATE usos SET validado_em = now() WHERE id = $1",
-    [usoId]
-  );
-
-  res.redirect(`/unidades/${id}?salvo=1`);
+  await pool.query("UPDATE usos SET validado_em = now() WHERE id = $1", [req.params.uso_id]);
+  res.redirect(`/unidades/${req.params.id}?salvo=1`);
 });
 
 app.post("/unidades/:id/usos/:uso_id/reabrir", async (req, res) => {
-  const id = Number(req.params.id);
-  const usoId = Number(req.params.uso_id);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(usoId) || usoId <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const r = await pool.query(
-    "SELECT id FROM usos WHERE id = $1 AND aula_id = $2",
-    [usoId, id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Uso não encontrado.");
-  }
-
-  await pool.query(
-    "UPDATE usos SET validado_em = NULL WHERE id = $1",
-    [usoId]
-  );
-
-  res.redirect(`/unidades/${id}?salvo=1`);
+  await pool.query("UPDATE usos SET validado_em = NULL WHERE id = $1", [req.params.uso_id]);
+  res.redirect(`/unidades/${req.params.id}?salvo=1`);
 });
 
-// ----- Fim das rotas de uso -----
+// ==========================================
+// OUTRAS ROTAS
+// ==========================================
 
 app.get("/revisao", async (req, res) => {
-  try {
-    const r = await pool.query(
-      `SELECT o.id, o.titulo,
-              COALESCE(
-                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                   FROM obras_autores oa WHERE oa.obra_id = o.id),
-                ''
-              ) AS autores,
-              (SELECT COUNT(*)::int FROM usos u WHERE u.obra_id = o.id) AS total_usos,
-              (
-                SELECT COUNT(*)::int
-                  FROM usos u
-                 WHERE u.obra_id = o.id
-                   AND (
-                     EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id)
-                   )
-                   AND (
-                     u.validado_em IS NULL
-                     OR EXISTS (
-                       SELECT 1 FROM usos u3
-                        WHERE u3.obra_id = u.obra_id
-                          AND u3.aula_id <> u.aula_id
-                          AND u3.atualizado_em > u.validado_em
-                     )
-                   )
-              ) AS usos_a_avaliar
-         FROM obras o
-        WHERE o.arquivada = false
-          AND EXISTS (
-            SELECT 1
-              FROM usos u
-             WHERE u.obra_id = o.id
-               AND (
-                 EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id)
-               )
-               AND (
-                 u.validado_em IS NULL
-                 OR EXISTS (
-                   SELECT 1 FROM usos u3
-                    WHERE u3.obra_id = u.obra_id
-                      AND u3.aula_id <> u.aula_id
-                      AND u3.atualizado_em > u.validado_em
-                 )
-               )
-          )
-        ORDER BY o.titulo`,
-      []
-    );
-
-    res.render("revisao", {
-      titulo: "Revisão de Usos",
-      obras: r.rows
-    });
-  } catch (err) {
-    console.error("Erro na fila de revisão:", err.message);
-    res.status(500).type("text/plain").send("Erro ao carregar a fila de revisão.");
-  }
+  const r = await pool.query(
+    `SELECT o.id, o.titulo, COALESCE((SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem) FROM obras_autores oa WHERE oa.obra_id = o.id), '') AS autores, (SELECT COUNT(*)::int FROM usos u WHERE u.obra_id = o.id) AS total_usos,
+            (SELECT COUNT(*)::int FROM usos u WHERE u.obra_id = o.id AND (EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id)) AND (u.validado_em IS NULL OR EXISTS (SELECT 1 FROM usos u3 WHERE u3.obra_id = u.obra_id AND u3.aula_id <> u.aula_id AND u3.atualizado_em > u.validado_em))) AS usos_a_avaliar
+       FROM obras o WHERE o.arquivada = false AND EXISTS (SELECT 1 FROM usos u WHERE u.obra_id = o.id AND (EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id)) AND (u.validado_em IS NULL OR EXISTS (SELECT 1 FROM usos u3 WHERE u3.obra_id = u.obra_id AND u3.aula_id <> u.aula_id AND u3.atualizado_em > u.validado_em))) ORDER BY o.titulo`, []
+  );
+  res.render("revisao", { titulo: "Revisão de Usos", obras: r.rows });
 });
 
 app.get("/buscar", async (req, res) => {
   const q = String(req.query.q || "").trim();
-
-  if (!q) {
-    return res.render("buscar", {
-      titulo: "Buscar",
-      termo: "",
-      resultados: [],
-      total: 0,
-      buscou: false
-    });
-  }
+  if (!q) return res.render("buscar", { titulo: "Buscar", termo: "", resultados: [], total: 0, buscou: false });
 
   const padrao = `%${q}%`;
-
   try {
     const r = await pool.query(
-      `WITH RECURSIVE arvore AS (
-         SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel
-           FROM unidades
-          WHERE arquivada = false
-         UNION ALL
-         SELECT a.raiz_id, u.id, u.titulo, u.superior_id, a.nivel + 1
-           FROM unidades u
-           JOIN arvore a ON u.id = a.superior_id
-       ),
-       caminhos AS (
-         SELECT raiz_id,
-                STRING_AGG(titulo, ' › ' ORDER BY nivel DESC) AS caminho
-           FROM arvore
-          GROUP BY raiz_id
-       )
-       SELECT u.id, u.tipo, u.titulo, u.codigo, u.descricao,
-              u.pergunta_norteadora,
-              f.modelo,
-              f.problema, f.apresentacao, f.conteudo_html,
-              c.caminho
-         FROM unidades u
-         LEFT JOIN fichas f ON f.aula_id = u.id
-         LEFT JOIN caminhos c ON c.raiz_id = u.id
-        WHERE u.arquivada = false
-          AND (
-            u.titulo ILIKE $1
-            OR u.descricao ILIKE $1
-            OR u.pergunta_norteadora ILIKE $1
-            OR f.problema ILIKE $1
-            OR f.apresentacao ILIKE $1
-            OR f.conteudo_html ILIKE $1
-          )
-        ORDER BY u.tipo, u.titulo
-        LIMIT 200`,
-      [padrao]
+      `WITH RECURSIVE arvore AS (SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel FROM unidades WHERE arquivada = false UNION ALL SELECT a.raiz_id, u.id, u.titulo, u.superior_id, a.nivel + 1 FROM unidades u JOIN arvore a ON u.id = a.superior_id),
+       caminhos AS (SELECT raiz_id, STRING_AGG(titulo, ' › ' ORDER BY nivel DESC) AS caminho FROM arvore GROUP BY raiz_id)
+       SELECT u.id, u.tipo, u.titulo, u.codigo, u.descricao, u.pergunta_norteadora, f.modelo, f.problema, f.apresentacao, f.conteudo_html, c.caminho
+         FROM unidades u LEFT JOIN fichas f ON f.aula_id = u.id LEFT JOIN caminhos c ON c.raiz_id = u.id
+        WHERE u.arquivada = false AND (u.titulo ILIKE $1 OR u.descricao ILIKE $1 OR u.pergunta_norteadora ILIKE $1 OR f.problema ILIKE $1 OR f.apresentacao ILIKE $1 OR f.conteudo_html ILIKE $1)
+        ORDER BY u.tipo, u.titulo LIMIT 200`, [padrao]
     );
 
     function extrairTrecho(texto, termo) {
       if (!texto) return null;
-      const limpo = String(texto)
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/\s+/g, " ")
-        .trim();
-
+      const limpo = String(texto).replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
       const idx = limpo.toLowerCase().indexOf(termo.toLowerCase());
       if (idx === -1) return null;
-
-      const inicio = Math.max(0, idx - 60);
-      const fim = Math.min(limpo.length, idx + termo.length + 60);
-      let trecho = limpo.slice(inicio, fim);
-      if (inicio > 0) trecho = "…" + trecho;
-      if (fim < limpo.length) trecho = trecho + "…";
-      return trecho;
+      const inicio = Math.max(0, idx - 60), fim = Math.min(limpo.length, idx + termo.length + 60);
+      return (inicio > 0 ? "…" : "") + limpo.slice(inicio, fim) + (fim < limpo.length ? "…" : "");
     }
 
     const resultados = r.rows.map((u) => {
-      let campo = null;
-      let trecho = null;
-
-      if (u.titulo && u.titulo.toLowerCase().includes(q.toLowerCase())) {
-        campo = "Título";
-      } else if (u.descricao && u.descricao.toLowerCase().includes(q.toLowerCase())) {
-        campo = "Descrição";
-        trecho = extrairTrecho(u.descricao, q);
-      } else if (u.pergunta_norteadora && u.pergunta_norteadora.toLowerCase().includes(q.toLowerCase())) {
-        campo = "Pergunta norteadora";
-        trecho = extrairTrecho(u.pergunta_norteadora, q);
-      } else if (u.modelo === "novo") {
-        for (const [k, rotulo] of [["problema", "Problema da aula"], ["apresentacao", "Apresentação"]]) {
-          if (u[k] && u[k].toLowerCase().includes(q.toLowerCase())) {
-            campo = rotulo;
-            trecho = extrairTrecho(u[k], q);
-            break;
-          }
-        }
-      } else if (u.conteudo_html && u.conteudo_html.toLowerCase().includes(q.toLowerCase())) {
-        campo = "Conteúdo da ficha";
-        trecho = extrairTrecho(u.conteudo_html, q);
-      }
-
-      return {
-        ...u,
-        campo,
-        trecho,
-        rotuloTipo: ROTULO_TIPO[u.tipo] || u.tipo
-      };
+      let campo = null, trecho = null;
+      if (u.titulo && u.titulo.toLowerCase().includes(q.toLowerCase())) campo = "Título";
+      else if (u.descricao && u.descricao.toLowerCase().includes(q.toLowerCase())) { campo = "Descrição"; trecho = extrairTrecho(u.descricao, q); }
+      else if (u.pergunta_norteadora && u.pergunta_norteadora.toLowerCase().includes(q.toLowerCase())) { campo = "Pergunta norteadora"; trecho = extrairTrecho(u.pergunta_norteadora, q); }
+      else if (u.modelo === "novo") { for (const [k, rotulo] of [["problema", "Problema da aula"], ["apresentacao", "Apresentação"]]) { if (u[k] && u[k].toLowerCase().includes(q.toLowerCase())) { campo = rotulo; trecho = extrairTrecho(u[k], q); break; } } }
+      else if (u.conteudo_html && u.conteudo_html.toLowerCase().includes(q.toLowerCase())) { campo = "Conteúdo da ficha"; trecho = extrairTrecho(u.conteudo_html, q); }
+      return { ...u, campo, trecho, rotuloTipo: ROTULO_TIPO[u.tipo] || u.tipo };
     });
 
-    res.render("buscar", {
-      titulo: `Busca: ${q}`,
-      termo: q,
-      resultados,
-      total: resultados.length,
-      buscou: true
-    });
+    res.render("buscar", { titulo: `Busca: ${q}`, termo: q, resultados, total: resultados.length, buscou: true });
   } catch (err) {
-    console.error("Erro na busca:", err.message);
-    res.status(500).type("text/plain").send("Erro ao buscar. Tente novamente.");
+    res.status(500).type("text/plain").send("Erro ao buscar.");
   }
 });
 
 app.get("/unidades/:id", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const r = await pool.query(
-    "SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora FROM unidades WHERE id = $1",
-    [id]
-  );
-  if (r.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Unidade não encontrada.");
-  }
+  const r = await pool.query("SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora FROM unidades WHERE id = $1", [id]);
+  if (r.rows.length === 0) return res.status(404).type("text/plain").send("Unidade não encontrada.");
   const unidade = r.rows[0];
 
-  const filhosR = await pool.query(
-    "SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 AND arquivada = false",
-    [id]
-  );
-
+  const filhosR = await pool.query("SELECT id, tipo, titulo, codigo FROM unidades WHERE superior_id = $1 AND arquivada = false", [id]);
   filhosR.rows.sort((a, b) => {
-    function extrairNumeros(titulo) {
-      const match = String(titulo).match(/^(\d+(?:\.\d+)*)/);
-      if (!match) return [9999];
-      return match[1].split('.').map(Number);
-    }
-
-    const numsA = extrairNumeros(a.titulo);
-    const numsB = extrairNumeros(b.titulo);
-
-    for (let i = 0; i < Math.max(numsA.length, numsB.length); i++) {
-      const numA = numsA[i] || 0;
-      const numB = numsB[i] || 0;
-      if (numA !== numB) {
-        return numA - numB;
-      }
-    }
-    
+    function extrairNumeros(titulo) { const match = String(titulo).match(/^(\d+(?:\.\d+)*)/); return match ? match[1].split('.').map(Number) : [9999]; }
+    const numsA = extrairNumeros(a.titulo), numsB = extrairNumeros(b.titulo);
+    for (let i = 0; i < Math.max(numsA.length, numsB.length); i++) { if ((numsA[i] || 0) !== (numsB[i] || 0)) return (numsA[i] || 0) - (numsB[i] || 0); }
     return String(a.titulo).localeCompare(String(b.titulo));
   });
 
@@ -2675,73 +1021,24 @@ app.get("/unidades/:id", async (req, res) => {
 
   let ficha = null;
   if (unidade.tipo === "aula") {
-    const fr = await pool.query(
-      `SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, apresentacao
-         FROM fichas
-        WHERE aula_id = $1`,
-      [id]
-    );
-
-    if (fr.rows.length > 0) {
-      ficha = fr.rows[0];
-    }
+    const fr = await pool.query(`SELECT id, conteudo_html, versao_atual, criado_em, atualizado_em, modelo, problema, apresentacao FROM fichas WHERE aula_id = $1`, [id]);
+    if (fr.rows.length > 0) ficha = fr.rows[0];
   }
 
   let usosAula = [];
   if (unidade.tipo === "aula") {
     const ua = await pool.query(
-      `SELECT u.id, u.obra_id, u.edicao_id, u.papel, u.modalidade,
-              u.orientacao, u.observacoes, u.validado_em, u.atualizado_em,
-              o.titulo AS obra_titulo,
-              COALESCE(
-                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                   FROM obras_autores oa WHERE oa.obra_id = o.id),
-                ''
-              ) AS obra_autores,
-              e.id AS edicao_id_ref, e.editora AS edicao_editora, e.ano AS edicao_ano,
-              e.capa_url AS edicao_capa_url,
-              (
-                EXISTS (
-                  SELECT 1 FROM usos u2
-                   WHERE u2.obra_id = u.obra_id
-                     AND u2.aula_id <> u.aula_id
-                )
-                AND (
-                  u.validado_em IS NULL
-                  OR EXISTS (
-                    SELECT 1 FROM usos u3
-                     WHERE u3.obra_id = u.obra_id
-                       AND u3.aula_id <> u.aula_id
-                       AND u3.atualizado_em > u.validado_em
-                  )
-                )
-              ) AS a_avaliar
-         FROM usos u
-         JOIN obras o ON o.id = u.obra_id
-         LEFT JOIN edicoes e ON e.id = u.edicao_id
-        WHERE u.aula_id = $1
-        ORDER BY
-          CASE u.papel
-            WHEN 'texto_base' THEN 1
-            WHEN 'texto_complementar' THEN 2
-            WHEN 'ficcao_ancora' THEN 3
-            WHEN 'ficcao_complementar' THEN 4
-            ELSE 5
-          END,
-          o.titulo`,
-      [id]
+      `SELECT u.id, u.obra_id, u.papel, u.modalidade, u.orientacao, u.observacoes, u.validado_em, u.atualizado_em, o.titulo AS obra_titulo, o.capa_url AS edicao_capa_url,
+              COALESCE((SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem) FROM obras_autores oa WHERE oa.obra_id = o.id), '') AS obra_autores,
+              (EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id) AND (u.validado_em IS NULL OR EXISTS (SELECT 1 FROM usos u3 WHERE u3.obra_id = u.obra_id AND u3.aula_id <> u.aula_id AND u3.atualizado_em > u.validado_em))) AS a_avaliar
+         FROM usos u JOIN obras o ON o.id = u.obra_id WHERE u.aula_id = $1
+        ORDER BY CASE u.papel WHEN 'texto_base' THEN 1 WHEN 'texto_complementar' THEN 2 WHEN 'ficcao_ancora' THEN 3 WHEN 'ficcao_complementar' THEN 4 ELSE 5 END, o.titulo`, [id]
     );
 
     const usoIds = ua.rows.map((u) => u.id);
     let recortesPorUso = {};
     if (usoIds.length > 0) {
-      const rr = await pool.query(
-        `SELECT id, uso_id, rotulo, tipo, observacao, ordem
-           FROM usos_recortes
-          WHERE uso_id = ANY($1::bigint[])
-          ORDER BY uso_id, ordem, id`,
-        [usoIds]
-      );
+      const rr = await pool.query(`SELECT id, uso_id, rotulo, tipo, observacao, ordem FROM usos_recortes WHERE uso_id = ANY($1::bigint[]) ORDER BY uso_id, ordem, id`, [usoIds]);
       for (const r of rr.rows) {
         if (!recortesPorUso[r.uso_id]) recortesPorUso[r.uso_id] = [];
         recortesPorUso[r.uso_id].push(r);
@@ -2749,395 +1046,122 @@ app.get("/unidades/:id", async (req, res) => {
     }
 
     usosAula = ua.rows.map((u) => ({
-      ...u,
-      recortes: recortesPorUso[u.id] || [],
-      rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel,
-      rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
-      a_avaliar: u.a_avaliar,
-      rotuloEstado: u.a_avaliar ? "A Avaliar" : "Validado"
+      ...u, recortes: recortesPorUso[u.id] || [], rotuloPapel: ROTULO_PAPEL[u.papel] || u.papel, rotuloModalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
+      a_avaliar: u.a_avaliar, rotuloEstado: u.a_avaliar ? "A Avaliar" : "Validado"
     }));
   }
 
   let caminhoCurricular = "";
   if (unidade.tipo === "aula") {
-    const cadeiaDaAula = await cadeiaDeSuperiores(id);
-    caminhoCurricular = cadeiaDaAula.map((u) => u.titulo).join(" › ");
+    caminhoCurricular = (await cadeiaDeSuperiores(id)).map((u) => u.titulo).join(" › ");
   }
 
-  const salvo = req.query.salvo === "1";
-  const nadaMudou = req.query.salvo === "0";
-
   res.render("unidade-detalhe", {
-    titulo: unidade.titulo,
-    unidade,
-    filhos: filhosR.rows,
-    cadeia,
-    rotuloTipo: ROTULO_TIPO[unidade.tipo],
-    rotuloTipoExibido: rotuloTipoOuOmissao(unidade.tipo, unidade.codigo),
-    proximoNivel: proximo,
-    rotuloProximo: proximo ? ROTULO_TIPO[proximo] : null,
-    rotuloNovoProximo: proximo ? ROTULO_NOVO[proximo] : null,
-    nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo],
-    ficha,
-    usosAula,
-    caminhoCurricular,
-    salvo,
-    nadaMudou
+    titulo: unidade.titulo, unidade, filhos: filhosR.rows, cadeia,
+    rotuloTipo: ROTULO_TIPO[unidade.tipo], rotuloTipoExibido: rotuloTipoOuOmissao(unidade.tipo, unidade.codigo),
+    proximoNivel: proximo, rotuloProximo: proximo ? ROTULO_TIPO[proximo] : null, rotuloNovoProximo: proximo ? ROTULO_NOVO[proximo] : null,
+    nomeFilhoPlural: unidade.tipo === "aula" ? null : NOME_FILHO_PLURAL[unidade.tipo], ficha, usosAula, caminhoCurricular,
+    salvo: req.query.salvo === "1", nadaMudou: req.query.salvo === "0"
   });
 });
 
 app.get("/exportar/livros", async (req, res) => {
   try {
-    const obrasR = await pool.query(
-      `SELECT o.id, o.titulo, o.tipo_material,
-              COALESCE(
-                (SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem)
-                   FROM obras_autores oa WHERE oa.obra_id = o.id),
-                ''
-              ) AS autores
-         FROM obras o
-        WHERE o.arquivada = false
-        ORDER BY o.titulo`
-    );
-
-    const usosR = await pool.query(
-      `SELECT u.obra_id, u.papel, u.modalidade, u.orientacao,
-              u.validado_em,
-              a.id AS aula_id, a.titulo AS aula_titulo,
-              e.editora AS edicao_editora, e.ano AS edicao_ano,
-              (
-                EXISTS (
-                  SELECT 1 FROM usos u2
-                   WHERE u2.obra_id = u.obra_id
-                     AND u2.aula_id <> u.aula_id
-                )
-                AND (
-                  u.validado_em IS NULL
-                  OR EXISTS (
-                    SELECT 1 FROM usos u3
-                     WHERE u3.obra_id = u.obra_id
-                       AND u3.aula_id <> u.aula_id
-                       AND u3.atualizado_em > u.validado_em
-                  )
-                )
-              ) AS a_avaliar
-         FROM usos u
-         JOIN unidades a ON a.id = u.aula_id
-         LEFT JOIN edicoes e ON e.id = u.edicao_id
-        ORDER BY a.titulo`
-    );
-
-    const recortesR = await pool.query(
-      `SELECT uso_id, rotulo, tipo, observacao, ordem
-         FROM usos_recortes
-        ORDER BY uso_id, ordem, id`
-    );
+    const obrasR = await pool.query(`SELECT o.id, o.titulo, o.tipo_material, COALESCE((SELECT STRING_AGG(oa.nome, ', ' ORDER BY oa.ordem) FROM obras_autores oa WHERE oa.obra_id = o.id), '') AS autores FROM obras o WHERE o.arquivada = false ORDER BY o.titulo`);
+    const usosR = await pool.query(`SELECT u.id AS uso_id, u.obra_id, u.papel, u.modalidade, u.orientacao, u.validado_em, a.id AS aula_id, a.titulo AS aula_titulo, (EXISTS (SELECT 1 FROM usos u2 WHERE u2.obra_id = u.obra_id AND u2.aula_id <> u.aula_id) AND (u.validado_em IS NULL OR EXISTS (SELECT 1 FROM usos u3 WHERE u3.obra_id = u.obra_id AND u3.aula_id <> u.aula_id AND u3.atualizado_em > u.validado_em))) AS a_avaliar FROM usos u JOIN unidades a ON a.id = u.aula_id ORDER BY a.titulo`);
+    const recortesR = await pool.query(`SELECT uso_id, rotulo, tipo, observacao, ordem FROM usos_recortes ORDER BY uso_id, ordem, id`);
 
     const recortesPorUso = {};
-    for (const r of recortesR.rows) {
-      if (!recortesPorUso[r.uso_id]) recortesPorUso[r.uso_id] = [];
-      recortesPorUso[r.uso_id].push(r);
-    }
-
+    for (const r of recortesR.rows) { if (!recortesPorUso[r.uso_id]) recortesPorUso[r.uso_id] = []; recortesPorUso[r.uso_id].push(r); }
     const aulasIds = [...new Set(usosR.rows.map((u) => u.aula_id))];
     const caminhosPorAula = {};
     if (aulasIds.length > 0) {
-      const caminhosR = await pool.query(
-        `WITH RECURSIVE arvore AS (
-           SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel
-             FROM unidades
-            WHERE id = ANY($1::bigint[])
-           UNION ALL
-           SELECT a.raiz_id, u.id, u.titulo, u.superior_id, a.nivel + 1
-             FROM unidades u
-             JOIN arvore a ON u.id = a.superior_id
-         )
-         SELECT raiz_id,
-                STRING_AGG(titulo, ' › ' ORDER BY nivel DESC) AS caminho
-           FROM arvore
-          GROUP BY raiz_id`,
-        [aulasIds]
-      );
-      for (const row of caminhosR.rows) {
-        caminhosPorAula[row.raiz_id] = row.caminho;
-      }
+      const caminhosR = await pool.query(`WITH RECURSIVE arvore AS (SELECT id AS raiz_id, id, titulo, superior_id, 1 AS nivel FROM unidades WHERE id = ANY($1::bigint[]) UNION ALL SELECT a.raiz_id, u.id, u.titulo, u.superior_id, a.nivel + 1 FROM unidades u JOIN arvore a ON u.id = a.superior_id) SELECT raiz_id, STRING_AGG(titulo, ' › ' ORDER BY nivel DESC) AS caminho FROM arvore GROUP BY raiz_id`, [aulasIds]);
+      for (const row of caminhosR.rows) caminhosPorAula[row.raiz_id] = row.caminho;
     }
 
     const obrasMap = new Map();
-    for (const o of obrasR.rows) {
-      obrasMap.set(o.id, {
-        titulo: o.titulo,
-        autores: o.autores ? o.autores.split(", ") : [],
-        tipo_material: o.tipo_material,
-        usos: []
-      });
+    for (const o of obrasR.rows) obrasMap.set(o.id, { titulo: o.titulo, autores: o.autores ? o.autores.split(", ") : [], tipo_material: o.tipo_material, usos: [] });
+    for (const u of usosR.rows) {
+      const obra = obrasMap.get(u.obra_id); if (!obra) continue;
+      obra.usos.push({ aula_titulo: u.aula_titulo, aula_caminho: caminhosPorAula[u.aula_id] || "", papel: ROTULO_PAPEL[u.papel] || u.papel, modalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade, orientacao: u.orientacao || null, recortes: (recortesPorUso[u.uso_id] || []).map((r) => ({ tipo: r.tipo, rotulo: r.rotulo || null, observacao: r.observacao || null })), estado: u.a_avaliar ? "A Avaliar" : "Validado" });
     }
 
-    const usosComIdR = await pool.query(
-      `SELECT u.id AS uso_id, u.obra_id, u.papel, u.modalidade, u.orientacao,
-              u.validado_em,
-              a.id AS aula_id, a.titulo AS aula_titulo,
-              e.editora AS edicao_editora, e.ano AS edicao_ano,
-              (
-                EXISTS (
-                  SELECT 1 FROM usos u2
-                   WHERE u2.obra_id = u.obra_id
-                     AND u2.aula_id <> u.aula_id
-                )
-                AND (
-                  u.validado_em IS NULL
-                  OR EXISTS (
-                    SELECT 1 FROM usos u3
-                     WHERE u3.obra_id = u.obra_id
-                       AND u3.aula_id <> u.aula_id
-                       AND u3.atualizado_em > u.validado_em
-                  )
-                )
-              ) AS a_avaliar
-         FROM usos u
-         JOIN unidades a ON a.id = u.aula_id
-         LEFT JOIN edicoes e ON e.id = u.edicao_id
-        ORDER BY a.titulo`
-    );
-
-    for (const u of usosComIdR.rows) {
-      const obra = obrasMap.get(u.obra_id);
-      if (!obra) continue;
-      obra.usos.push({
-        aula_titulo: u.aula_titulo,
-        aula_caminho: caminhosPorAula[u.aula_id] || "",
-        papel: ROTULO_PAPEL[u.papel] || u.papel,
-        modalidade: ROTULO_MODALIDADE[u.modalidade] || u.modalidade,
-        edicao: u.edicao_editora
-          ? `${u.edicao_editora}${u.edicao_ano ? ", " + u.edicao_ano : ""}`
-          : null,
-        orientacao: u.orientacao || null,
-        recortes: (recortesPorUso[u.uso_id] || []).map((r) => ({
-          tipo: r.tipo,
-          rotulo: r.rotulo || null,
-          observacao: r.observacao || null
-        })),
-        estado: u.a_avaliar ? "A Avaliar" : "Validado"
-      });
-    }
-
-    const json = {
-      versao_formato: 1,
-      exportado_em: new Date().toISOString(),
-      obras: Array.from(obrasMap.values()).map((o) => ({
-        ...o,
-        tipo_material: ROTULO_TIPO_MATERIAL[o.tipo_material] || o.tipo_material
-      }))
-    };
-
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${nomeArquivoExportacao("livros")}"`
-    );
+    const json = { versao_formato: 1, exportado_em: new Date().toISOString(), obras: Array.from(obrasMap.values()).map((o) => ({ ...o, tipo_material: ROTULO_TIPO_MATERIAL[o.tipo_material] || o.tipo_material })) };
+    res.setHeader("Content-Disposition", `attachment; filename="${nomeArquivoExportacao("livros")}"`);
     res.type("application/json").send(JSON.stringify(json, null, 2));
-  } catch (err) {
-    console.error("Erro ao exportar livros:", err.message);
-    res.status(500).type("text/plain").send("Erro ao exportar livros.");
-  }
+  } catch (err) { res.status(500).type("text/plain").send("Erro ao exportar livros."); }
 });
 
 app.get("/exportar/ementa", async (req, res) => {
   try {
-    const unidadesR = await pool.query(
-      `SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora
-         FROM unidades
-        WHERE arquivada = false
-        ORDER BY tipo, id`
-    );
-
+    const unidadesR = await pool.query(`SELECT id, tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora FROM unidades WHERE arquivada = false ORDER BY tipo, id`);
     const porId = new Map();
-    for (const u of unidadesR.rows) {
-      porId.set(u.id, {
-        id: u.id,
-        titulo: u.titulo,
-        codigo: u.codigo || null,
-        descricao: u.descricao || null,
-        pergunta_norteadora: u.pergunta_norteadora || null,
-        tipo: u.tipo,
-        filhos: []
-      });
-    }
+    for (const u of unidadesR.rows) porId.set(u.id, { id: u.id, titulo: u.titulo, codigo: u.codigo || null, descricao: u.descricao || null, pergunta_norteadora: u.pergunta_norteadora || null, tipo: u.tipo, filhos: [] });
 
     const raizes = [];
     for (const u of porId.values()) {
-      if (u.tipo === "eixo") {
-        raizes.push(u);
-      } else {
+      if (u.tipo === "eixo") raizes.push(u);
+      else {
         const pai = unidadesR.rows.find((x) => x.id === u.id);
         const paiId = pai ? pai.superior_id : null;
         const paiObj = paiId ? porId.get(paiId) : null;
-        if (paiObj) {
-          paiObj.filhos.push(u);
-        }
+        if (paiObj) paiObj.filhos.push(u);
       }
     }
 
-    function ordenarArvore(no) {
-      no.filhos.sort((a, b) => (a.id || 0) - (b.id || 0));
-      for (const f of no.filhos) ordenarArvore(f);
-    }
+    function ordenarArvore(no) { no.filhos.sort((a, b) => (a.id || 0) - (b.id || 0)); for (const f of no.filhos) ordenarArvore(f); }
     for (const r of raizes) ordenarArvore(r);
 
-    function converter(no) {
-      if (no.tipo === "eixo") {
-        return {
-          id: no.id,
-          titulo: no.titulo,
-          codigo: no.codigo,
-          descricao: no.descricao,
-          disciplinas: no.filhos
-            .filter((f) => f.tipo === "disciplina")
-            .map(converterDisciplina)
-        };
-      }
-      return null;
-    }
+    function converter(no) { return no.tipo === "eixo" ? { id: no.id, titulo: no.titulo, codigo: no.codigo, descricao: no.descricao, disciplinas: no.filhos.filter((f) => f.tipo === "disciplina").map(converterDisciplina) } : null; }
+    function converterDisciplina(no) { return { id: no.id, titulo: no.titulo, codigo: no.codigo, descricao: no.descricao, temas: no.filhos.filter((f) => f.tipo === "tema").map(converterTema) }; }
+    function converterTema(no) { return { id: no.id, titulo: no.titulo, codigo: no.codigo, pergunta_norteadora: no.pergunta_norteadora, aulas: no.filhos.filter((f) => f.tipo === "aula").map(converterAula) }; }
+    function converterAula(no) { return { id: no.id, titulo: no.titulo, codigo: no.codigo }; }
 
-    function converterDisciplina(no) {
-      return {
-        id: no.id,
-        titulo: no.titulo,
-        codigo: no.codigo,
-        descricao: no.descricao,
-        temas: no.filhos.filter((f) => f.tipo === "tema").map(converterTema)
-      };
-    }
-
-    function converterTema(no) {
-      return {
-        id: no.id,
-        titulo: no.titulo,
-        codigo: no.codigo,
-        pergunta_norteadora: no.pergunta_norteadora,
-        aulas: no.filhos.filter((f) => f.tipo === "aula").map(converterAula)
-      };
-    }
-
-    function converterAula(no) {
-      return {
-        id: no.id,
-        titulo: no.titulo,
-        codigo: no.codigo
-      };
-    }
-
-    const json = {
-      versao_formato: 1,
-      exportado_em: new Date().toISOString(),
-      eixos: raizes.map(converter)
-    };
-
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${nomeArquivoExportacao("ementa")}"`
-    );
+    const json = { versao_formato: 1, exportado_em: new Date().toISOString(), eixos: raizes.map(converter) };
+    res.setHeader("Content-Disposition", `attachment; filename="${nomeArquivoExportacao("ementa")}"`);
     res.type("application/json").send(JSON.stringify(json, null, 2));
-  } catch (err) {
-    console.error("Erro ao exportar ementa:", err.message);
-    res.status(500).type("text/plain").send("Erro ao exportar ementa.");
-  }
+  } catch (err) { res.status(500).type("text/plain").send("Erro ao exportar ementa."); }
 });
 
 app.get("/health", async (req, res) => {
   try {
     const r = await pool.query("SELECT COUNT(*)::int AS total FROM unidades WHERE arquivada = false");
-    res.json({
-      status: "ok",
-      service: "literatura-critica-comparada-v2",
-      banco: "conectado",
-      unidades: r.rows[0].total
-    });
-  } catch (err) {
-    console.error("Erro ao consultar o banco:", err.message);
-    res.status(500).json({
-      status: "erro",
-      service: "literatura-critica-comparada-v2",
-      banco: "falhou",
-      mensagem: err.message
-    });
-  }
+    res.json({ status: "ok", service: "literatura-critica-comparada-v2", banco: "conectado", unidades: r.rows[0].total });
+  } catch (err) { res.status(500).json({ status: "erro", banco: "falhou", mensagem: err.message }); }
 });
 
 app.post("/unidades/:id/temas/importar", express.json({ limit: "5mb" }), async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
+  const dr = await pool.query("SELECT id, tipo, titulo FROM unidades WHERE id = $1 AND arquivada = false", [id]);
+  if (dr.rows.length === 0 || dr.rows[0].tipo !== "disciplina") return res.status(400).type("text/plain").send("Disciplina inválida.");
 
-  const dr = await pool.query(
-    "SELECT id, tipo, titulo FROM unidades WHERE id = $1 AND arquivada = false",
-    [id]
-  );
-  if (dr.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Disciplina não encontrada.");
-  }
-  const disciplina = dr.rows[0];
-  if (disciplina.tipo !== "disciplina") {
-    return res.status(400).type("text/plain").send("Só disciplinas recebem temas.");
-  }
-
-  let entrada = null;
-
-  if (req.body && typeof req.body.texto === "string") {
-    const linhas = req.body.texto
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0);
-
-    entrada = linhas.map((linha) => {
-      const m = linha.match(/^([0-9]+(?:\.[0-9]+)*)\s*[—–\-\.]\s*(.+)$/);
-      if (m) {
-        return { codigo: m[1].trim(), titulo: m[2].trim() };
-      }
-      return { codigo: null, titulo: linha };
-    });
-  } else {
-    entrada = Array.isArray(req.body) ? req.body : req.body && req.body.temas;
-  }
-
-  if (!Array.isArray(entrada) || entrada.length === 0) {
-    return res.status(400).type("text/plain").send("Nenhum tema encontrado no texto enviado.");
-  }
+  let entrada = typeof req.body.texto === "string" ? req.body.texto.split("\n").map((l) => l.trim()).filter((l) => l.length > 0).map((linha) => { const m = linha.match(/^([0-9]+(?:\.[0-9]+)*)\s*[—–\-\.]\s*(.+)$/); return m ? { codigo: m[1].trim(), titulo: m[2].trim() } : { codigo: null, titulo: linha }; }) : (Array.isArray(req.body) ? req.body : req.body && req.body.temas);
+  if (!Array.isArray(entrada) || entrada.length === 0) return res.status(400).type("text/plain").send("Nenhum tema encontrado.");
 
   const temas = [];
   const erros = [];
   entrada.forEach((t, i) => {
     const titulo = String((t && t.titulo) || "").trim();
-    const codigo = String((t && t.codigo) || "").trim() || null;
-    const pergunta = String((t && t.pergunta_norteadora) || "").trim() || null;
-    if (!titulo) { erros.push("Item " + (i + 1) + ": título é obrigatório."); return; }
-    temas.push({ titulo, codigo, pergunta });
+    if (!titulo) { erros.push("Item " + (i + 1) + ": título obrigatório."); return; }
+    temas.push({ titulo, codigo: String((t && t.codigo) || "").trim() || null, pergunta: String((t && t.pergunta_norteadora) || "").trim() || null });
   });
-  if (erros.length > 0) {
-    return res.status(400).json({ erros });
-  }
+  if (erros.length > 0) return res.status(400).json({ erros });
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const criados = [];
     for (const t of temas) {
-      const r = await client.query(
-        "INSERT INTO unidades (tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora) VALUES ('tema', $1, $2, $3, NULL, $4) RETURNING id, titulo",
-        [t.titulo, t.codigo, id, t.pergunta]
-      );
+      const r = await client.query("INSERT INTO unidades (tipo, titulo, codigo, superior_id, descricao, pergunta_norteadora) VALUES ('tema', $1, $2, $3, NULL, $4) RETURNING id, titulo", [t.titulo, t.codigo, id, t.pergunta]);
       criados.push(r.rows[0]);
     }
     await client.query("COMMIT");
-
-    if (req.is("application/json")) {
-      return res.json({ ok: true, disciplina, criados });
-    }
+    if (req.is("application/json")) return res.json({ ok: true, criados });
     res.redirect("/unidades/" + id + "?salvo=1");
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Erro ao importar temas:", err.message);
-    res.status(500).type("text/plain").send("Erro interno ao importar. Nada foi gravado.");
+    res.status(500).type("text/plain").send("Erro ao importar.");
   } finally {
     client.release();
   }
@@ -3145,114 +1169,35 @@ app.post("/unidades/:id/temas/importar", express.json({ limit: "5mb" }), async (
 
 app.get("/unidades/:id/temas/importar", async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    return res.status(400).type("text/plain").send("Id inválido.");
-  }
-
-  const dr = await pool.query(
-    "SELECT id, tipo, titulo, codigo, superior_id FROM unidades WHERE id = $1 AND arquivada = false",
-    [id]
-  );
-  if (dr.rows.length === 0) {
-    return res.status(404).type("text/plain").send("Disciplina não encontrada.");
-  }
-  const disciplina = dr.rows[0];
-  if (disciplina.tipo !== "disciplina") {
-    return res.status(400).type("text/plain").send("Só disciplinas recebem temas.");
-  }
-
-  const cadeia = await cadeiaDeSuperiores(disciplina.superior_id);
-
-  res.render("temas-importar", {
-    titulo: "Importar Temas — " + disciplina.titulo,
-    disciplina,
-    cadeia,
-    erros: []
-  });
+  const dr = await pool.query("SELECT id, tipo, titulo, codigo, superior_id FROM unidades WHERE id = $1 AND arquivada = false", [id]);
+  if (dr.rows.length === 0 || dr.rows[0].tipo !== "disciplina") return res.status(400).type("text/plain").send("Disciplina inválida.");
+  res.render("temas-importar", { titulo: "Importar Temas — " + dr.rows[0].titulo, disciplina: dr.rows[0], cadeia: await cadeiaDeSuperiores(dr.rows[0].superior_id), erros: [] });
 });
 
 app.get("/infos", async (req, res) => {
   try {
-    const ementaR = await pool.query(`
-      SELECT tipo, COUNT(*)::int AS total 
-        FROM unidades 
-       WHERE arquivada = false 
-       GROUP BY tipo
-    `);
-    
+    const ementaR = await pool.query(`SELECT tipo, COUNT(*)::int AS total FROM unidades WHERE arquivada = false GROUP BY tipo`);
     const ementa = { eixo: 0, disciplina: 0, tema: 0, aula: 0 };
     ementaR.rows.forEach(row => { ementa[row.tipo] = row.total; });
 
     const obrasR = await pool.query("SELECT COUNT(*)::int AS total FROM obras WHERE arquivada = false");
-    const autoresTotalR = await pool.query(`
-      SELECT COUNT(DISTINCT oa.nome)::int AS total 
-        FROM obras_autores oa
-        JOIN obras o ON o.id = oa.obra_id
-       WHERE o.arquivada = false
-    `);
-    const edicoesR = await pool.query(`
-      SELECT COUNT(*)::int AS total 
-        FROM edicoes e
-        JOIN obras o ON o.id = e.obra_id
-       WHERE o.arquivada = false
-    `);
-    
+    const autoresTotalR = await pool.query(`SELECT COUNT(DISTINCT oa.nome)::int AS total FROM obras_autores oa JOIN obras o ON o.id = oa.obra_id WHERE o.arquivada = false`);
     const usosR = await pool.query("SELECT COUNT(*)::int AS total FROM usos");
     const usosValidadosR = await pool.query("SELECT COUNT(*)::int AS total FROM usos WHERE validado_em IS NOT NULL");
 
-    const topAutoresR = await pool.query(`
-      SELECT oa.nome AS autor, COUNT(u.id)::int AS total_usos
-        FROM obras_autores oa
-        JOIN obras o ON o.id = oa.obra_id
-        JOIN usos u ON u.obra_id = o.id
-       WHERE o.arquivada = false
-       GROUP BY oa.nome
-       ORDER BY total_usos DESC, oa.nome ASC
-       LIMIT 10
-    `);
-
-    const topPaisesR = await pool.query(`
-      SELECT oa.pais, COUNT(u.id)::int AS total_usos
-        FROM obras_autores oa
-        JOIN obras o ON o.id = oa.obra_id
-        JOIN usos u ON u.obra_id = o.id
-       WHERE o.arquivada = false
-         AND oa.pais IS NOT NULL
-         AND oa.pais <> ''
-       GROUP BY oa.pais
-       ORDER BY total_usos DESC, oa.pais ASC
-       LIMIT 10
-    `);
+    const topAutoresR = await pool.query(`SELECT oa.nome AS autor, COUNT(u.id)::int AS total_usos FROM obras_autores oa JOIN obras o ON o.id = oa.obra_id JOIN usos u ON u.obra_id = o.id WHERE o.arquivada = false GROUP BY oa.nome ORDER BY total_usos DESC, oa.nome ASC LIMIT 10`);
+    const topPaisesR = await pool.query(`SELECT oa.pais, COUNT(u.id)::int AS total_usos FROM obras_autores oa JOIN obras o ON o.id = oa.obra_id JOIN usos u ON u.obra_id = o.id WHERE o.arquivada = false AND oa.pais IS NOT NULL AND oa.pais <> '' GROUP BY oa.pais ORDER BY total_usos DESC, oa.pais ASC LIMIT 10`);
 
     const dados = {
-      ementa: {
-        eixos: ementa.eixo,
-        disciplinas: ementa.disciplina,
-        temas: ementa.tema,
-        aulas: ementa.aula,
-        total: ementa.eixo + ementa.disciplina + ementa.tema + ementa.aula
-      },
-      bibliografia: {
-        obras: obrasR.rows[0].total,
-        autores: autoresTotalR.rows[0].total,
-        edicoes: edicoesR.rows[0].total,
-        usos: usosR.rows[0].total,
-        usos_validados: usosValidadosR.rows[0].total
-      },
-      topAutores: topAutoresR.rows,
-      topPaises: topPaisesR.rows
+      ementa: { eixos: ementa.eixo, disciplinas: ementa.disciplina, temas: ementa.tema, aulas: ementa.aula, total: ementa.eixo + ementa.disciplina + ementa.tema + ementa.aula },
+      bibliografia: { obras: obrasR.rows[0].total, autores: autoresTotalR.rows[0].total, usos: usosR.rows[0].total, usos_validados: usosValidadosR.rows[0].total },
+      topAutores: topAutoresR.rows, topPaises: topPaisesR.rows
     };
 
-    res.render("infos", {
-      titulo: "Infos — Painel de Controle",
-      dados
-    });
+    res.render("infos", { titulo: "Infos — Painel de Controle", dados });
   } catch (err) {
-    console.error("Erro na página de infos:", err.message);
     res.status(500).type("text/plain").send("Erro ao carregar as estatísticas.");
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor ouvindo em http://localhost:${PORT}`);
-});
+app.listen(PORT, () => { console.log(`Servidor ouvindo em http://localhost:${PORT}`); });

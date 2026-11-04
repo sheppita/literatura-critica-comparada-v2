@@ -51,16 +51,6 @@
       <ul id="lista-busca-obras" class="lista-autocomplete"></ul>
     </div>
 
-    <label for="edicao_id">Edição <span class="ajuda">(Opcional)</span></label>
-    <select id="edicao_id" name="edicao_id">
-      <option value="">— Edição não especificada —</option>
-      <% for (const e of edicoes) { %>
-        <option value="<%= e.id %>" <%= valores.edicao_id === String(e.id) ? 'selected' : '' %>>
-          <%= e.editora || '—' %><% if (e.ano) { %>, <%= e.ano %><% } %>
-        </option>
-      <% } %>
-    </select>
-
     <label for="papel">Papel</label>
     <select id="papel" name="papel">
       <% for (const [valor, rotulo] of papeis) { %>
@@ -120,10 +110,9 @@
 
   <%- include('./partials/botoes-flutuantes') %>
 
-    <script>
+  <script>
     (function () {
-      const selectObraAntigo = document.getElementById("obra_id"); // Agora é hidden
-      const selectEdicao = document.getElementById("edicao_id");
+      const inputObraId = document.getElementById("obra_id");
       const listaRecortes = document.getElementById("lista-recortes");
       const btnAdd = document.getElementById("btn-add-recorte");
       const molde = document.getElementById("molde-recorte");
@@ -135,39 +124,10 @@
       const btnLimpar = document.getElementById("btn-limpar-obra");
       let timeoutDebounce;
 
-      async function carregarEdicoes(preservarSelecao) {
-        const obraId = selectObraAntigo.value;
-        const selecaoAtual = preservarSelecao ? selectEdicao.value : null;
-        selectEdicao.innerHTML = '<option value="">— Edição não especificada —</option>';
-        if (!obraId) return;
-        try {
-          const r = await fetch("/obras/" + obraId + "/edicoes.json");
-          const dados = await r.json();
-          for (const e of dados.edicoes) {
-            const opt = document.createElement("option");
-            opt.value = e.id;
-            let rotulo = e.editora || "—";
-            if (e.ano) rotulo += ", " + e.ano;
-            opt.textContent = rotulo;
-            if (selecaoAtual && String(e.id) === String(selecaoAtual)) {
-              opt.selected = true;
-            }
-            selectEdicao.appendChild(opt);
-          }
-        } catch (err) {
-          // silencioso
-        }
-      }
-
-      // Se já tem obra_id na edição, carrega as edições
-      if (selectObraAntigo.value) {
-        carregarEdicoes(true);
-      }
-
       // --- Lógica do Autocomplete ---
       inputBusca.addEventListener("input", (e) => {
         const termo = e.target.value.trim();
-        selectObraAntigo.value = ""; // Limpa o ID se o usuário mudar o texto
+        inputObraId.value = ""; // Limpa o ID se o usuário mudar o texto
         btnLimpar.style.display = termo ? "block" : "none";
 
         clearTimeout(timeoutDebounce);
@@ -208,21 +168,17 @@
 
       function selecionarObra(obra) {
         inputBusca.value = obra.titulo + (obra.autores ? ` — ${obra.autores}` : "");
-        selectObraAntigo.value = obra.id;
+        inputObraId.value = obra.id;
         listaBusca.style.display = "none";
         btnLimpar.style.display = "block";
-        
-        // Carrega as edições da obra recém-escolhida
-        carregarEdicoes(false); 
       }
 
       btnLimpar.addEventListener("click", () => {
         inputBusca.value = "";
-        selectObraAntigo.value = "";
+        inputObraId.value = "";
         btnLimpar.style.display = "none";
         listaBusca.style.display = "none";
         inputBusca.focus();
-        selectEdicao.innerHTML = '<option value="">— Edição não especificada —</option>';
       });
 
       // --- Lógica dos Recortes ---

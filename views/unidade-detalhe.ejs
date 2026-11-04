@@ -37,6 +37,14 @@
     <% if (unidade.codigo) { %><%= unidade.codigo %><% } %>
   </p>
 
+  <!-- BOTÕES DE EDITAR E EXCLUIR AQUI -->
+  <p style="font-size: 0.9rem; margin-top: -0.5rem; margin-bottom: 1.5rem;">
+    <a href="/unidades/<%= unidade.id %>/editar">Editar</a>
+    ·
+    <a href="/unidades/<%= unidade.id %>/excluir">Excluir</a>
+  </p>
+  <!-- FIM DOS BOTÕES -->
+
   <% if (unidade.descricao) { %>
     <p class="unidade-descricao"><%= unidade.descricao %></p>
   <% } %>
@@ -95,9 +103,6 @@
         <a href="/unidades/<%= unidade.id %>/ficha/editar" class="botao-ghost">
           Editar Ficha
         </a>
-        <a href="/unidades/<%= unidade.id %>/ficha/versoes" class="botao-ghost">
-          Histórico
-        </a>
       </p>
     <% } %>
   <% } %>
@@ -133,11 +138,6 @@
                 </div>
                 <div class="detalhe-suave">
                   <%= u.rotuloPapel %> · <%= u.rotuloModalidade %>
-                  <% if (u.edicao_id) { %>
-                    · Edição: <%= u.edicao_editora || '—' %><% if (u.edicao_ano) { %>, <%= u.edicao_ano %><% } %>
-                  <% } else { %>
-                    · <em>Edição não informada</em>
-                  <% } %>
                 </div>
                 <% if (u.recortes.length > 0) { %>
                   <div class="detalhe-suave">
@@ -228,12 +228,6 @@
       </a>
     </p>
   <% } %>
-
-  <p style="margin-top: 2rem;">
-    <a href="/unidades/<%= unidade.id %>/editar">Editar</a>
-    ·
-    <a href="/unidades/<%= unidade.id %>/excluir">Excluir</a>
-  </p>
 
   <%- include('./partials/botoes-flutuantes') %>
 </body>
