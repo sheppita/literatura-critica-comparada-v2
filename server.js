@@ -3191,6 +3191,7 @@ app.get("/unidades/:id/temas/importar", async (req, res) => {
 
 app.get("/infos", async (req, res) => {
   try {
+    // 1. Contagem da Ementa (Unidades)
     const ementaR = await pool.query(`
       SELECT tipo, COUNT(*)::int AS total 
         FROM unidades 
@@ -3201,8 +3202,9 @@ app.get("/infos", async (req, res) => {
     const ementa = { eixo: 0, disciplina: 0, tema: 0, aula: 0 };
     ementaR.rows.forEach(row => { ementa[row.tipo] = row.total; });
 
+    // 2. Contagem da Bibliografia
     const obrasR = await pool.query("SELECT COUNT(*)::int AS total FROM obras WHERE arquivada = false");
-    const autoresR = await pool.query(`
+    const autoresTotalR = await pool.query(`
       SELECT COUNT(DISTINCT oa.nome)::int AS total 
         FROM obras_autores oa
         JOIN obras o ON o.id = oa.obra_id
@@ -3215,16 +3217,35 @@ app.get("/infos", async (req, res) => {
        WHERE o.arquivada = false
     `);
     
+    // 3. Contagem de Usos (Obras nas aulas)
     const usosR = await pool.query("SELECT COUNT(*)::int AS total FROM usos");
     const usosValidadosR = await pool.query("SELECT COUNT(*)::int AS total FROM usos WHERE validado_em IS NOT NULL");
 
-    const fichasR = await pool.query(`
-      SELECT modelo, COUNT(*)::int AS total 
-        FROM fichas 
-       GROUP BY modelo
+    // 4. TOP 10 AUTORES (que mais aparecem em usos de obras nas aulas)
+    const topAutoresR = await pool.query(`
+      SELECT oa.nome AS autor, COUNT(u.id)::int AS total_usos
+        FROM obras_autores oa
+        JOIN obras o ON o.id = oa.obra_id
+        JOIN usos u ON u.obra_id = o.id
+       WHERE o.arquivada = false
+       GROUP BY oa.nome
+       ORDER BY total_usos DESC, oa.nome ASC
+       LIMIT 10
     `);
-    const fichas = { antigo: 0, novo: 0 };
-    fichasR.rows.forEach(row => { fichas[row.modelo || 'antigo'] = row.total; });
+
+    // 5. TOP 10 PAÍSES (soma dos usos das obras cujo autor é daquele país)
+    const topPaisesR = await pool.query(`
+      SELECT oa.pais, COUNT(u.id)::int AS total_usos
+        FROM obras_autores oa
+        JOIN obras o ON o.id = oa.obra_id
+        JOIN usos u ON u.obra_id = o.id
+       WHERE o.arquivada = false
+         AND oa.pais IS NOT NULL
+         AND oa.pais <> ''
+       GROUP BY oa.pais
+       ORDER BY total_usos DESC, oa.pais ASC
+       LIMIT 10
+    `);
 
     const dados = {
       ementa: {
@@ -3236,16 +3257,13 @@ app.get("/infos", async (req, res) => {
       },
       bibliografia: {
         obras: obrasR.rows[0].total,
-        autores: autoresR.rows[0].total,
+        autores: autoresTotalR.rows[0].total,
         edicoes: edicoesR.rows[0].total,
         usos: usosR.rows[0].total,
         usos_validados: usosValidadosR.rows[0].total
       },
-      fichas: {
-        antigas: fichas.antigo,
-        novas: fichas.novo,
-        total: fichas.antigo + fichas.novo
-      }
+      topAutores: topAutoresR.rows,
+      topPaises: topPaisesR.rows
     };
 
     res.render("infos", {
