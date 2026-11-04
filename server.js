@@ -1100,7 +1100,7 @@ app.post("/obras/nova", async (req, res) => {
   const titulo = String(req.body.titulo || "").trim();
   const tipo_material = String(req.body.tipo_material || "livro").trim();
   const autoresRaw = String(req.body.autores || "").trim();
-
+  const paisAutor = String(req.body.pais_autor || "").trim() || null; // NOVO CAMPO
   const edicao_editora = String(req.body.edicao_editora || "").trim() || null;
   const edicao_anoRaw = String(req.body.edicao_ano || "").trim();
   const edicao_capa_url = String(req.body.edicao_capa_url || "").trim() || null;
@@ -1162,12 +1162,11 @@ app.post("/obras/nova", async (req, res) => {
     );
     const obraId = obraR.rows[0].id;
 
-    for (let i = 0; i < autores.length; i++) {
+    for (let i = 0; i < autores.length; i++)
       await client.query(
-        "INSERT INTO obras_autores (obra_id, nome, ordem) VALUES ($1, $2, $3)",
-        [obraId, autores[i], i + 1]
+        "INSERT INTO obras_autores (obra_id, nome, ordem, pais) VALUES ($1, $2, $3, $4)",
+        [obraId, autores[i], i + 1, paisAutor] // Adicionado o paisAutor
       );
-    }
 
     if (temDadosEdicao) {
       await client.query(
@@ -1567,10 +1566,11 @@ app.get("/obras/:id/editar", async (req, res) => {
   const obra = or.rows[0];
 
   const autoresR = await pool.query(
-    "SELECT nome FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
+    "SELECT nome, pais FROM obras_autores WHERE obra_id = $1 ORDER BY ordem",
     [id]
   );
   const autoresTexto = autoresR.rows.map((a) => a.nome).join("\n");
+  const paisAtual = autoresR.rows.length > 0 ? (autoresR.rows[0].pais || "") : "";
 
   res.render("obra-form", {
     titulo: `Editar Obra`,
@@ -1581,7 +1581,8 @@ app.get("/obras/:id/editar", async (req, res) => {
     valores: {
       titulo: obra.titulo,
       tipo_material: obra.tipo_material,
-      autores: autoresTexto
+      autores: autoresTexto,
+      pais_autor: paisAtual
     },
     erros: [],
     tiposMaterial: Object.entries(ROTULO_TIPO_MATERIAL),
@@ -1603,7 +1604,7 @@ app.post("/obras/:id/editar", async (req, res) => {
   const titulo = String(req.body.titulo || "").trim();
   const tipo_material = String(req.body.tipo_material || "livro").trim();
   const autoresRaw = String(req.body.autores || "").trim();
-
+  const paisAutor = String(req.body.pais_autor || "").trim() || null;
   const erros = [];
   if (!titulo) erros.push("O título da obra é obrigatório.");
   if (!ROTULO_TIPO_MATERIAL[tipo_material]) erros.push("Tipo de material inválido.");
@@ -1647,8 +1648,8 @@ app.post("/obras/:id/editar", async (req, res) => {
     await client.query("DELETE FROM obras_autores WHERE obra_id = $1", [id]);
     for (let i = 0; i < autores.length; i++) {
       await client.query(
-        "INSERT INTO obras_autores (obra_id, nome, ordem) VALUES ($1, $2, $3)",
-        [id, autores[i], i + 1]
+        "INSERT INTO obras_autores (obra_id, nome, ordem, pais) VALUES ($1, $2, $3, $4)",
+        [id, autores[i], i + 1, paisAutor]
       );
     }
 
